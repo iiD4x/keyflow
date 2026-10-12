@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "KeyFlow",
+  "version": "0.2.2",
+  "identifier": "com.keyflow.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "palette",
+        "title": "KeyFlow",
+        "width": 720,
+        "height": 620,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "center": true,
+        "windowEffects": {
+          "effects": ["acrylic"],
+          "state": "active"
+        }
+      },
+      {
+        "label": "manager",
+        "title": "KeyFlow Settings",
+        "url": "/",
+        "width": 1060,
+        "height": 700,
+        "minWidth": 900,
+        "minHeight": 560,
+        "resizable": true,
+        "decorations": true,
+        "visible": false,
+        "center": true,
+        "dragDropEnabled": false
+      },
+      {
+        "label": "confirm",
+        "title": "KeyFlow Confirm",
+        "url": "/",
+        "width": 420,
+        "height": 76,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "visible": false,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.ico"],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+name: Bug report
+description: Something did not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please redact anything private before pasting logs or snippets.
+  - type: input
+    id: version
+    attributes:
+      label: KeyFlow version
+      description: Settings > About, or the installer file name
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows build
+      description: The output of winver, for example Windows 11 24H2 (26100)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do
+      description: The exact keystrokes or clicks, the snippet trigger, and its settings (trigger mode, typing mode, standalone word, sensitive)
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Which app you typed into, whether another text expander was running, and relevant lines from %APPDATA%\KeyFlow\keyflow.log
+    validations:
+      required: false
