@@ -57,6 +57,9 @@ pub struct Settings {
     pub paused: bool,
     #[serde(default)]
     pub autostart: bool,
+    /// Folder for configuration backups. Absent or empty means the default folder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup_dir: Option<String>,
 }
 
 impl Default for Settings {
@@ -65,6 +68,7 @@ impl Default for Settings {
             default_mode: TypingMode::Fast,
             paused: false,
             autostart: false,
+            backup_dir: None,
         }
     }
 }

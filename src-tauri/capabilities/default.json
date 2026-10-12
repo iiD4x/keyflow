@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default capability for KeyFlow windows",
   "windows": ["palette", "manager", "confirm"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:default"]
 }

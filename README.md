@@ -99,11 +99,12 @@ Screenshots use demo snippets only.
 - Per-snippet Sensitive flag for screenshots and screen recordings
 - Tray icon: pause, start with Windows, reload configuration, exit. Native Win32 hooks, no AutoHotkey required
 - Configuration: %APPDATA%\KeyFlow\config.json (readable JSON, reloaded when it changes on disk, written atomically with a config.backup.json snapshot of the previous revision)
+- Backup tab: one-click snapshots into a folder you can change, restore from any backup file with a native file picker, and a pre-restore snapshot so a wrong restore is undoable
 
 <details>
 <summary><b>Replacement tokens</b></summary>
 
-Tokens are case-insensitive and use the {} syntax familiar from FastKeys and AutoHotkey.
+Tokens are case-insensitive and use the {} syntax; anything unrecognised inside braces is typed literally.
 
 | Kind | Tokens |
 | --- | --- |
@@ -131,7 +132,7 @@ Download the latest KeyFlow_x.y.z_x64-setup.exe from Releases and run it; it ins
 
 ## Usage notes
 
-- While KeyFlow runs, quit any other text expander (for example FastKeys) so the same trigger does not expand twice.
+- While KeyFlow runs, quit any other text expander so the same trigger does not expand twice.
 - Windows blocks synthetic input into elevated (admin) windows from normal processes; run KeyFlow elevated if you need expansion inside admin apps.
 - Anti-cheat protected games often ignore hook-generated input.
 - IME composition (Chinese/Japanese input) is not tracked, and triggers are matched from the letter and digit keys.

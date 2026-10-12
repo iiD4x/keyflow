@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { listen } from "@tauri-apps/api/event";
-  import { api, type ImportReport, type Snippet, type Status, type TypingMode } from "$lib/api";
+  import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+  import { api, type BackupList, type ImportReport, type Snippet, type Status, type TypingMode } from "$lib/api";
 
-  type Tab = "snippets" | "import" | "settings" | "about";
+  type Tab = "snippets" | "import" | "backup" | "settings" | "about";
 
   let tab = $state<Tab>("snippets");
   let snippets = $state<Snippet[]>([]);
@@ -25,11 +26,15 @@
   let histIdx = $state(-1);
   let histTimer: ReturnType<typeof setTimeout> | null = null;
   let lastEditingRef: Snippet | null = null;
+  let backups = $state<BackupList | null>(null);
+  let pendingRestore = $state<string | null>(null);
+  let pendingDelete = $state<string | null>(null);
 
   const modes: TypingMode[] = ["instant", "fast", "human", "slow"];
   const tabs: { id: Tab; label: string }[] = [
     { id: "snippets", label: "Snippets" },
     { id: "import", label: "Import" },
+    { id: "backup", label: "Backup" },
     { id: "settings", label: "Settings" },
     { id: "about", label: "About" }
   ];
@@ -349,7 +354,7 @@
         addNew();
         tick().then(() => triggerInput?.focus());
       } else if (t === "snippets" || t === "import" || t === "settings" || t === "about") {
-        tab = t as Tab;
+        selectTab(t as Tab);
       }
     });
     const un2 = listen("manager-open-snippet", (e) => {
@@ -372,6 +377,152 @@
       un3.then((f) => f());
     };
   });
+
+  function selectTab(id: Tab) {
+    tab = id;
+    if (id === "backup") loadBackups();
+  }
+
+  async function loadBackups() {
+    try {
+      backups = await api.listBackups();
+    } catch (e) {
+      flash("Backup folder unavailable: " + String(e));
+    }
+  }
+
+  function stamp() {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  }
+
+  function joinPath(dir: string, name: string) {
+    return dir.replace(/[\\/]+$/, "") + "/" + name;
+  }
+
+  function fmtDate(ms: number) {
+    return ms ? new Date(ms).toLocaleString() : "unknown time";
+  }
+
+  function fmtSize(bytes: number) {
+    return bytes < 1024 ? bytes + " B" : (bytes / 1024).toFixed(1) + " KB";
+  }
+
+  async function backupNow() {
+    busy = true;
+    try {
+      backups = await api.backupNow();
+      flash("Backup written to " + backups.dir);
+    } catch (e) {
+      flash("Backup failed: " + String(e));
+    }
+    busy = false;
+  }
+
+  async function backupCopy() {
+    if (!backups) return;
+    let target: string | null = null;
+    try {
+      target = await saveDialog({
+        title: "Save a backup copy",
+        defaultPath: joinPath(backups.dir, "keyflow-backup-" + stamp() + ".json"),
+        filters: [{ name: "KeyFlow backup", extensions: ["json"] }]
+      });
+    } catch (e) {
+      flash("Save dialog failed: " + String(e));
+      return;
+    }
+    if (!target) return;
+    try {
+      await api.backupTo(target);
+      await loadBackups();
+      flash("Backup saved to " + target);
+    } catch (e) {
+      flash("Save failed: " + String(e));
+    }
+  }
+
+  async function chooseBackupDir() {
+    let picked: string | string[] | null = null;
+    try {
+      picked = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "Choose the folder for backups",
+        defaultPath: backups?.dir
+      });
+    } catch (e) {
+      flash("Folder picker failed: " + String(e));
+      return;
+    }
+    if (typeof picked !== "string") return;
+    try {
+      backups = await api.setBackupDir(picked);
+      flash("Backup folder changed");
+    } catch (e) {
+      flash("Could not use that folder: " + String(e));
+    }
+  }
+
+  async function resetBackupDir() {
+    try {
+      backups = await api.setBackupDir(null);
+      flash("Backup folder reset to the default");
+    } catch (e) {
+      flash("Reset failed: " + String(e));
+    }
+  }
+
+  async function pickRestoreFile() {
+    let picked: string | string[] | null = null;
+    try {
+      picked = await openDialog({
+        multiple: false,
+        title: "Restore from a KeyFlow backup",
+        defaultPath: backups?.dir,
+        filters: [{ name: "KeyFlow backup", extensions: ["json"] }]
+      });
+    } catch (e) {
+      flash("File picker failed: " + String(e));
+      return;
+    }
+    if (typeof picked === "string") pendingRestore = picked;
+  }
+
+  async function confirmRestore(path: string) {
+    busy = true;
+    try {
+      status = await api.restoreBackup(path);
+      pendingRestore = null;
+      await refresh();
+      await loadBackups();
+      flash("Configuration restored");
+    } catch (e) {
+      flash("Restore failed: " + String(e));
+    }
+    busy = false;
+  }
+
+  async function confirmDelete(path: string) {
+    try {
+      await api.deleteBackup(path);
+      pendingDelete = null;
+      await loadBackups();
+      flash("Backup deleted");
+    } catch (e) {
+      flash("Delete failed: " + String(e));
+    }
+  }
+
+  async function reveal(path: string) {
+    try {
+      await api.openPath(path, true);
+    } catch (e) {
+      flash("Could not open Explorer: " + String(e));
+    }
+  }
+
 </script>
 
 <div class="min-h-screen bg-[#0d0f14] text-[13.5px] text-white/90" oncontextmenu={(e) => e.preventDefault()}>
@@ -382,7 +533,7 @@
       {#each tabs as t (t.id)}
         <button
           type="button"
-          onclick={() => (tab = t.id)}
+          onclick={() => selectTab(t.id)}
           class={["rounded-lg px-3 py-1.5 text-[13px]", tab === t.id ? "bg-white/10 font-medium text-white" : "text-white/45 hover:text-white/80"].join(" ")}
         >{t.label}</button>
       {/each}
@@ -690,6 +841,84 @@
         </div>
       </div>
     {:else if tab === "settings"}
+    {:else if tab === "backup"}
+      <div class="max-w-3xl space-y-4">
+        <div class="rounded-xl border border-white/8 bg-white/[0.03] p-5">
+          <h2 class="mb-2 text-[14.5px] font-semibold">Backups</h2>
+          <p class="mb-4 text-[13px] leading-relaxed text-white/50">
+            A backup is a copy of your snippets and settings. Restoring replaces what is loaded now; the current
+            state is snapshotted into the same folder first, so a restore you did not want is one click away from
+            being undone.
+          </p>
+          {#if backups}
+            <div class="mb-4">
+              <div class="text-[11px] uppercase tracking-wide text-white/35">Backup folder</div>
+              <div class="mt-1.5 flex gap-2">
+                <input
+                  readonly
+                  value={backups.dir}
+                  class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-[12.5px] text-white/70 outline-none"
+                />
+                <button type="button" onclick={chooseBackupDir} class="shrink-0 rounded-lg bg-white/5 px-3.5 py-2 text-white/70 hover:bg-white/10">Change…</button>
+                <button type="button" onclick={() => backups && reveal(backups.dir)} class="shrink-0 rounded-lg bg-white/5 px-3.5 py-2 text-white/70 hover:bg-white/10">Open</button>
+              </div>
+              {#if !backups.is_default}
+                <button type="button" onclick={resetBackupDir} class="mt-2 text-left text-[12.5px] text-white/40 hover:text-white/70">
+                  Reset to the default folder: <span class="font-mono">{backups.default_dir}</span>
+                </button>
+              {/if}
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick={backupNow} disabled={busy} class="rounded-lg bg-[#5B8CFF] px-4 py-2 font-medium text-white hover:bg-[#4a7cf5]">Back up now</button>
+              <button type="button" onclick={backupCopy} class="rounded-lg bg-white/5 px-4 py-2 text-white/75 hover:bg-white/10">Save a copy…</button>
+              <button type="button" onclick={pickRestoreFile} class="rounded-lg bg-white/5 px-4 py-2 text-white/75 hover:bg-white/10">Restore from file…</button>
+            </div>
+          {:else}
+            <p class="text-[13px] text-white/35">Loading…</p>
+          {/if}
+        </div>
+
+        {#if backups}
+          <div class="rounded-xl border border-white/8 bg-white/[0.03] p-5">
+            <div class="mb-3 flex items-center justify-between">
+              <h2 class="text-[14.5px] font-semibold">In this folder</h2>
+              <span class="text-[12.5px] text-white/40">{backups.entries.length} file{backups.entries.length === 1 ? "" : "s"}</span>
+            </div>
+            {#if backups.entries.length === 0}
+              <p class="text-[13px] text-white/35">Nothing here yet — press Back up now.</p>
+            {:else}
+              <div class="divide-y divide-white/5">
+                {#each backups.entries as b (b.path)}
+                  <div class="flex items-center justify-between gap-4 py-2.5">
+                    <div class="min-w-0">
+                      <div class="truncate font-mono text-[12.5px] text-white/75">{b.name}</div>
+                      <div class="text-[11.5px] text-white/40">
+                        {fmtDate(b.modified_ms)} · {b.snippets === null ? "unreadable" : b.snippets + " snippets"} · {fmtSize(b.size)}
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-1.5">
+                      {#if pendingRestore === b.path}
+                        <span class="text-[12px] text-amber-300/90">Replace what is loaded now?</span>
+                        <button type="button" onclick={() => confirmRestore(b.path)} disabled={busy} class="rounded-lg bg-amber-400/15 px-3 py-1.5 text-[12.5px] font-medium text-amber-200 hover:bg-amber-400/25">Restore</button>
+                        <button type="button" onclick={() => (pendingRestore = null)} class="rounded-lg bg-white/5 px-3 py-1.5 text-[12.5px] text-white/60 hover:bg-white/10">Cancel</button>
+                      {:else if pendingDelete === b.path}
+                        <span class="text-[12px] text-rose-300/90">Delete this file?</span>
+                        <button type="button" onclick={() => confirmDelete(b.path)} class="rounded-lg bg-rose-400/15 px-3 py-1.5 text-[12.5px] font-medium text-rose-200 hover:bg-rose-400/25">Delete</button>
+                        <button type="button" onclick={() => (pendingDelete = null)} class="rounded-lg bg-white/5 px-3 py-1.5 text-[12.5px] text-white/60 hover:bg-white/10">Cancel</button>
+                      {:else}
+                        <button type="button" onclick={() => (pendingRestore = b.path)} class="rounded-lg bg-white/5 px-3 py-1.5 text-[12.5px] text-white/70 hover:bg-white/10">Restore</button>
+                        <button type="button" onclick={() => reveal(b.path)} class="rounded-lg bg-white/5 px-3 py-1.5 text-[12.5px] text-white/70 hover:bg-white/10">Reveal</button>
+                        <button type="button" onclick={() => (pendingDelete = b.path)} class="rounded-lg px-3 py-1.5 text-[12.5px] text-white/35 hover:text-rose-300">Delete</button>
+                      {/if}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+
       <div class="max-w-2xl">
         {#if status}
           <div class="rounded-xl border border-white/8 bg-white/[0.03] p-5">
@@ -746,7 +975,7 @@
         <div class="rounded-xl border border-white/8 bg-white/[0.03] p-5">
           <h2 class="mb-2 text-[14.5px] font-semibold text-white/90">About KeyFlow</h2>
           <p class="mb-3">
-            A FastKeys-style text expander for Windows, built with the same stack as asyar: Tauri 2, Rust and Svelte 5.
+            A local-first text expander for Windows, built with the same stack as asyar: Tauri 2, Rust and Svelte 5.
             Type a trigger anywhere and KeyFlow replaces it — including {"{tab}"}, {"{enter}"} and other keys.
           </p>
           <p class="mb-3">
@@ -757,7 +986,7 @@
           </p>
           <p>
             Notes: Windows blocks input into elevated (admin) windows from normal apps, and anti-cheat games may ignore hook
-            input. Quit FastKeys while KeyFlow runs to avoid double expansion of the same triggers.
+            input. Quit any other text expander while KeyFlow runs to avoid double expansion of the same triggers.
           </p>
         </div>
       </div>

@@ -28,6 +28,23 @@ export interface Status {
   snippet_count: number;
   version: string;
   fastkeys_db: string | null;
+  backup_dir: string;
+  backup_dir_is_default: boolean;
+}
+
+export interface BackupEntry {
+  name: string;
+  path: string;
+  size: number;
+  modified_ms: number;
+  snippets: number | null;
+}
+
+export interface BackupList {
+  dir: string;
+  default_dir: string;
+  is_default: boolean;
+  entries: BackupEntry[];
 }
 
 export interface ImportRule {
@@ -63,5 +80,12 @@ export const api = {
   sendTest: (text: string, mode: TypingMode, delayMs: number) => invoke<void>("send_test", { text, mode, delayMs }),
   fastkeysPath: () => invoke<string | null>("fastkeys_db_path"),
   parseFdb: (path: string) => invoke<ImportReport>("parse_fdb", { path }),
-  importFdb: (path: string, replace: boolean) => invoke<ImportReport>("import_fdb", { path, replace })
+  importFdb: (path: string, replace: boolean) => invoke<ImportReport>("import_fdb", { path, replace }),
+  listBackups: () => invoke<BackupList>("list_backups"),
+  backupNow: () => invoke<BackupList>("backup_now"),
+  backupTo: (path: string) => invoke<string>("backup_to", { path }),
+  restoreBackup: (path: string) => invoke<Status>("restore_backup", { path }),
+  setBackupDir: (dir: string | null) => invoke<BackupList>("set_backup_dir", { dir }),
+  openPath: (path: string, reveal: boolean) => invoke<void>("open_path", { path, reveal }),
+  deleteBackup: (path: string) => invoke<void>("delete_backup", { path })
 };

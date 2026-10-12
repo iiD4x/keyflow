@@ -158,4 +158,17 @@ extern "system" {
 extern "system" {
     pub fn GetCurrentProcessId() -> DWORD;
     pub fn GetModuleHandleW(lpModuleName: *const u16) -> HINSTANCE;
+    pub fn GetLocalTime(lpSystemTime: *mut SYSTEMTIME);
+}
+
+#[repr(C)]
+pub struct SYSTEMTIME {
+    pub wYear: u16,
+    pub wMonth: u16,
+    pub wDayOfWeek: u16,
+    pub wDay: u16,
+    pub wHour: u16,
+    pub wMinute: u16,
+    pub wSecond: u16,
+    pub wMilliseconds: u16,
 }

@@ -5,6 +5,7 @@ mod engine;
 mod exec;
 mod fdb;
 mod win;
+mod backup;
 
 use config::{Config, Settings, Snippet, TypingMode};
 use engine::{Engine, Job, UiCmd};
@@ -39,6 +40,8 @@ struct Status {
     snippet_count: usize,
     version: String,
     fastkeys_db: Option<String>,
+    backup_dir: String,
+    backup_dir_is_default: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -56,6 +59,26 @@ struct ImportReport {
     skipped_duplicates: usize,
     rules: Vec<ImportRule>,
 }
+#[derive(Serialize, Clone)]
+struct BackupList {
+    dir: String,
+    default_dir: String,
+    is_default: bool,
+    entries: Vec<backup::BackupEntry>,
+}
+
+fn backup_list(state: &tauri::State<AppState>) -> Result<BackupList, String> {
+    let cfg = state.config.lock().map_err(|e| e.to_string())?;
+    let dir = backup::resolved_dir(&cfg);
+    let default_dir = backup::default_dir();
+    Ok(BackupList {
+        is_default: dir == default_dir,
+        dir: dir.display().to_string(),
+        default_dir: default_dir.display().to_string(),
+        entries: backup::list(&dir),
+    })
+}
+
 
 fn status_of(app: &AppHandle) -> Status {
     let st = app.state::<AppState>();
@@ -67,6 +90,8 @@ fn status_of(app: &AppHandle) -> Status {
         snippet_count: cfg.snippets.len(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         fastkeys_db: fdb::detect_path(),
+        backup_dir: backup::resolved_dir(&cfg).display().to_string(),
+        backup_dir_is_default: backup::resolved_dir(&cfg) == backup::default_dir(),
     }
 }
 
@@ -358,7 +383,9 @@ fn update_settings(app: AppHandle, state: tauri::State<AppState>, settings: Sett
     let (prev_autostart, new_autostart) = {
         let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
         let prev = cfg.settings.autostart;
+        let keep_backup_dir = cfg.settings.backup_dir.clone();
         cfg.settings = settings;
+        cfg.settings.backup_dir = keep_backup_dir;
         cfg.save().map_err(|e| e.to_string())?;
         state.engine.update(&cfg);
         (prev, cfg.settings.autostart)
@@ -412,6 +439,101 @@ fn hide_palette(app: AppHandle) {
         let _ = w.hide();
     }
     restore_focus(&app);
+}
+
+#[tauri::command]
+fn list_backups(state: tauri::State<AppState>) -> Result<BackupList, String> {
+    backup_list(&state)
+}
+
+#[tauri::command]
+fn backup_now(state: tauri::State<AppState>) -> Result<BackupList, String> {
+    let dir = {
+        let cfg = state.config.lock().map_err(|e| e.to_string())?;
+        backup::resolved_dir(&cfg)
+    };
+    let path = backup::write_snapshot(&dir, &backup::snapshot_stem()).map_err(|e| e.to_string())?;
+    exec::logline(&format!("backup written: {}", path.display()));
+    backup_list(&state)
+}
+
+#[tauri::command]
+fn backup_to(path: String) -> Result<String, String> {
+    let target = std::path::PathBuf::from(&path);
+    backup::copy_to(&config::config_path(), &target).map_err(|e| e.to_string())?;
+    exec::logline(&format!("backup saved as: {}", target.display()));
+    Ok(target.display().to_string())
+}
+
+#[tauri::command]
+fn restore_backup(app: AppHandle, state: tauri::State<AppState>, path: String) -> Result<Status, String> {
+    let source = std::path::PathBuf::from(&path);
+    let text = std::fs::read_to_string(&source).map_err(|e| format!("read failed: {}", e))?;
+    let mut fresh: Config = serde_json::from_str(&text).map_err(|e| format!("not a KeyFlow backup: {}", e))?;
+    let dir = {
+        let cfg = state.config.lock().map_err(|e| e.to_string())?;
+        backup::resolved_dir(&cfg)
+    };
+    // Keep the current configuration, so a restore can be undone with one click.
+    let stem = format!("{}pre-restore-{}", backup::PREFIX, backup::stamp());
+    if let Ok(p) = backup::write_snapshot(&dir, &stem) {
+        exec::logline(&format!("pre-restore snapshot: {}", p.display()));
+    }
+    let (prev_autostart, new_autostart) = {
+        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        let prev = cfg.settings.autostart;
+        fresh.settings.backup_dir = cfg.settings.backup_dir.clone();
+        let new = fresh.settings.autostart;
+        *cfg = fresh;
+        cfg.save().map_err(|e| e.to_string())?;
+        state.engine.update(&cfg);
+        (prev, new)
+    };
+    if prev_autostart != new_autostart {
+        let _ = apply_autostart(new_autostart);
+    }
+    sync_tray_check(&app);
+    let _ = app.emit("config-updated", ());
+    exec::logline(&format!("restored from {}", source.display()));
+    Ok(status_of(&app))
+}
+
+#[tauri::command]
+fn set_backup_dir(app: AppHandle, state: tauri::State<AppState>, dir: Option<String>) -> Result<BackupList, String> {
+    {
+        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        cfg.settings.backup_dir = dir.and_then(|d| {
+            let t = d.trim().to_string();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t)
+            }
+        });
+        cfg.save().map_err(|e| e.to_string())?;
+    }
+    let list = backup_list(&state)?;
+    let _ = std::fs::create_dir_all(&list.dir);
+    exec::logline(&format!("backup folder: {}", list.dir));
+    let _ = app.emit("config-updated", ());
+    Ok(list)
+}
+
+#[tauri::command]
+fn open_path(path: String, reveal: bool) -> Result<(), String> {
+    let mut cmd = std::process::Command::new("explorer");
+    if reveal {
+        cmd.arg(format!("/select,{}", path));
+    } else {
+        cmd.arg(path);
+    }
+    cmd.spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_backup(path: String) -> Result<(), String> {
+    std::fs::remove_file(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -625,6 +747,7 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             open_manager_window(app, None);
         }))
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             list_snippets,
@@ -645,7 +768,14 @@ fn main() {
             send_test,
             fastkeys_db_path,
             parse_fdb,
-            import_fdb
+            import_fdb,
+            list_backups,
+            backup_now,
+            backup_to,
+            restore_backup,
+            set_backup_dir,
+            open_path,
+            delete_backup
         ])
         .setup(|app| {
             let cfg = Config::load();

@@ -3,9 +3,9 @@
   import { listen } from "@tauri-apps/api/event";
   import { api, type Snippet, type Status, type TriggerMode, type TypingMode } from "$lib/api";
 
-  type Item =
-    | { kind: "snippet"; id: string; title: string; sub: string; enabled: boolean; sensitive: boolean; triggerMode: TriggerMode; mode?: string | null }
-    | { kind: "action"; id: string; title: string; sub: string };
+  type SnippetItem = { kind: "snippet"; id: string; title: string; sub: string; enabled: boolean; sensitive: boolean; triggerMode: TriggerMode; mode?: string | null };
+  type ActionItem = { kind: "action"; id: string; title: string; sub: string };
+  type Item = SnippetItem | ActionItem;
 
   type MenuItem = {
     key: string;
@@ -48,10 +48,10 @@
     return s.length > 70 ? s.slice(0, 70) + "…" : s;
   }
 
-  const acts = $derived.by((): Item[] => {
+  const acts = $derived.by((): ActionItem[] => {
     if (!status) return [];
     const q = query.trim().toLowerCase();
-    const all: Item[] = [
+    const all: ActionItem[] = [
       { kind: "action", id: "new", title: "New snippet…", sub: "Open the editor on a fresh trigger" },
       { kind: "action", id: "settings", title: "Open KeyFlow settings", sub: "Snippets, typing modes and import" },
       { kind: "action", id: "import", title: "Import FastKeys rules", sub: "Open the import page in settings" },
@@ -66,7 +66,7 @@
     return all.filter((a) => !q || a.title.toLowerCase().includes(q) || a.sub.toLowerCase().includes(q));
   });
 
-  const snips = $derived.by((): Item[] => {
+  const snips = $derived.by((): SnippetItem[] => {
     const q = query.trim().toLowerCase();
     return snippets
       .filter((s) => !q || s.trigger.toLowerCase().includes(q) || s.replacement.toLowerCase().includes(q))

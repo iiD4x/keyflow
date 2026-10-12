@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.5
+
+- Backup tab: write snapshots of the configuration into a folder of your choice, with a native folder picker and one click to go back to the default location
+- Restore from any backup file through a native file picker; the configuration that is live right now is snapshotted first, so an unwanted restore can be undone
+- Save a copy of the configuration anywhere with the standard save dialog
+- The backup list shows snippet count, file size and time, with reveal-in-Explorer and per-file delete
+- Wording: KeyFlow now describes itself as a local-first text expander for Windows. The only FastKeys references left are the .fdb importer and its interoperability notes
+
 ## 0.2.4
 
 - Data safety: the previous configuration is snapshotted to config.backup.json before every save, and config.json is written through a temporary file followed by an atomic rename, so an interrupted or failed write can no longer truncate your snippets
