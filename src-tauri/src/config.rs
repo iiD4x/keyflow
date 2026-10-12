@@ -145,3 +145,55 @@ pub fn new_id() -> String {
         .unwrap_or(0);
     format!("s{}", ms)
 }
+
+#[cfg(test)]
+mod safety_tests {
+    use super::*;
+
+    fn snippet(id: &str, trigger: &str) -> Snippet {
+        Snippet {
+            id: id.to_string(),
+            trigger: trigger.to_string(),
+            replacement: String::new(),
+            enabled: true,
+            case_sensitive: false,
+            sensitive: false,
+            trigger_mode: TriggerMode::Auto,
+            word_boundary: false,
+            mode: None,
+        }
+    }
+
+    #[test]
+    fn safe_save_and_unreadable_handling() {
+        let dir = std::env::temp_dir().join(format!("keyflow-config-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        std::env::set_var("KEYFLOW_CONFIG_DIR", &dir);
+
+        // The first save has nothing to back up yet.
+        let mut first = Config::default();
+        first.snippets.push(snippet("1", "aa"));
+        first.save().unwrap();
+        assert!(config_path().exists());
+        assert!(!backup_path().exists());
+
+        // The second save keeps the previous revision.
+        let mut second = Config::default();
+        second.snippets.push(snippet("2", "bb"));
+        second.save().unwrap();
+        let backup: Config = serde_json::from_str(&fs::read_to_string(backup_path()).unwrap()).unwrap();
+        assert_eq!(backup.snippets.len(), 1);
+        assert_eq!(backup.snippets[0].trigger, "aa");
+
+        // Unreadable content is parked, never overwritten.
+        fs::write(config_path(), "{ not json").unwrap();
+        let loaded = Config::load();
+        assert!(loaded.snippets.is_empty());
+        let parked = dir.join("config.unreadable.json");
+        assert_eq!(fs::read_to_string(&parked).unwrap(), "{ not json");
+
+        std::env::remove_var("KEYFLOW_CONFIG_DIR");
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
