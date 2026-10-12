@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.4
+
+- Data safety: the previous configuration is snapshotted to config.backup.json before every save, and config.json is written through a temporary file followed by an atomic rename, so an interrupted or failed write can no longer truncate your snippets
+- Data safety: if config.json cannot be parsed it is preserved as config.unreadable.json instead of being overwritten, and the reason is written to the log
+- The configuration watcher logs unreadable or invalid JSON instead of silently continuing
+- KEYFLOW_CONFIG_DIR environment variable overrides the data directory, so development, demo and screenshot runs cannot touch your real configuration
+
 ## 0.2.3
 
 - Fixed: the confirmation prompt could appear with an empty trigger, because the confirm window was missing from the capability file and had no permission to receive events or call commands

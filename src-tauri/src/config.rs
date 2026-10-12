@@ -78,6 +78,11 @@ pub struct Config {
 }
 
 pub fn data_dir() -> PathBuf {
+    if let Ok(custom) = std::env::var("KEYFLOW_CONFIG_DIR") {
+        if !custom.trim().is_empty() {
+            return PathBuf::from(custom);
+        }
+    }
     let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".to_string());
     PathBuf::from(base).join("KeyFlow")
 }
@@ -86,17 +91,26 @@ pub fn config_path() -> PathBuf {
     data_dir().join("config.json")
 }
 
+pub fn backup_path() -> PathBuf {
+    data_dir().join("config.backup.json")
+}
+
 impl Config {
     pub fn load() -> Config {
         let path = config_path();
         match fs::read_to_string(&path) {
             Ok(text) => match serde_json::from_str::<Config>(&text) {
                 Ok(cfg) => cfg,
-                Err(_) => {
-                    let _ = fs::rename(&path, data_dir().join("config.broken.json"));
-                    let cfg = Config::default();
-                    let _ = cfg.save();
-                    cfg
+                Err(e) => {
+                    // Never overwrite content we could not read: park it and start empty.
+                    let parked = data_dir().join("config.unreadable.json");
+                    let _ = fs::rename(&path, &parked);
+                    crate::exec::logline(&format!(
+                        "config parse failed ({}); kept it as {}",
+                        e,
+                        parked.display()
+                    ));
+                    Config::default()
                 }
             },
             Err(_) => {
@@ -108,9 +122,19 @@ impl Config {
     }
 
     pub fn save(&self) -> std::io::Result<()> {
-        fs::create_dir_all(data_dir())?;
+        let dir = data_dir();
+        fs::create_dir_all(&dir)?;
         let text = serde_json::to_string_pretty(self).unwrap_or_default();
-        fs::write(config_path(), text)
+        let path = config_path();
+        // Keep the previous revision so any bad write can be undone.
+        if let Ok(previous) = fs::read(&path) {
+            let _ = fs::write(backup_path(), previous);
+        }
+        // Write through a temp file and rename, so readers never see a half-written config.
+        let tmp = dir.join("config.json.tmp");
+        fs::write(&tmp, text)?;
+        fs::rename(&tmp, &path)?;
+        Ok(())
     }
 }
 

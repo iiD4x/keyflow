@@ -98,7 +98,7 @@ Screenshots use demo snippets only.
 - Manager window with snippet list, editor, settings, and a FastKeys .fdb importer
 - Per-snippet Sensitive flag for screenshots and screen recordings
 - Tray icon: pause, start with Windows, reload configuration, exit. Native Win32 hooks, no AutoHotkey required
-- Configuration: %APPDATA%\KeyFlow\config.json (readable JSON, reloaded when it changes on disk)
+- Configuration: %APPDATA%\KeyFlow\config.json (readable JSON, reloaded when it changes on disk, written atomically with a config.backup.json snapshot of the previous revision)
 
 <details>
 <summary><b>Replacement tokens</b></summary>
@@ -122,6 +122,8 @@ Anything else inside braces is typed literally, so {not-a-token} is safe in your
 - Trigger detection uses global keyboard and mouse hooks with a small in-memory buffer of recently typed characters, used only for matching and discarded continuously. Nothing you type is stored or transmitted.
 - Snippets are stored in plain text in %APPDATA%\KeyFlow\config.json, as with most text expanders. The Sensitive flag blurs values in the UI; it is not encryption.
 - The log at %APPDATA%\KeyFlow\keyflow.log records matches with character counts and timings, not the expanded text.
+- Writes are safe by default: config.json is written to a temporary file and renamed into place, and the previous revision is kept as config.backup.json. If config.json ever fails to parse it is preserved as config.unreadable.json instead of being replaced, and the reason is logged.
+- Set the KEYFLOW_CONFIG_DIR environment variable to point KeyFlow at a different data folder (handy for testing, demos or a portable setup).
 
 ## Install
 

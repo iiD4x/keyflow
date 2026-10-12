@@ -584,7 +584,10 @@ fn spawn_config_watcher(app: AppHandle) {
                 .and_then(|t| serde_json::from_str::<Config>(&t).ok());
             let fresh = match fresh {
                 Some(f) => f,
-                None => continue,
+                None => {
+                    exec::logline("config reload skipped (unreadable or invalid JSON)");
+                    continue;
+                }
             };
             let st = app.state::<AppState>();
             let changed = {
