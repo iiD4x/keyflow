@@ -120,11 +120,14 @@ fn open_manager_window(app: &AppHandle, tab: Option<String>) {
 }
 
 static CONFIRM_GEN: AtomicU64 = AtomicU64::new(0);
+static CONFIRM_TEXT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
 fn show_confirm(app: &AppHandle, trigger: &str) {
     let gen = CONFIRM_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    if let Ok(mut t) = CONFIRM_TEXT.lock() {
+        *t = trigger.to_string();
+    }
     if let Some(w) = app.get_webview_window("confirm") {
-        let _ = app.emit_to("confirm", "confirm-show", trigger.to_string());
         if let Ok(Some(mon)) = app.primary_monitor() {
             let size = mon.size();
             let scale = mon.scale_factor();
@@ -137,6 +140,15 @@ fn show_confirm(app: &AppHandle, trigger: &str) {
             let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
         }
         let _ = w.show();
+        let _ = app.emit("confirm-show", trigger.to_string());
+        let late = app.clone();
+        let late_text = trigger.to_string();
+        std::thread::spawn(move || {
+            for delay in [250u64, 600, 1200] {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+                let _ = late.emit("confirm-show", late_text.clone());
+            }
+        });
     }
     let h = app.clone();
     std::thread::spawn(move || {
@@ -153,6 +165,11 @@ fn hide_confirm(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("confirm") {
         let _ = w.hide();
     }
+}
+
+#[tauri::command]
+fn confirm_text() -> String {
+    CONFIRM_TEXT.lock().map(|t| t.clone()).unwrap_or_default()
 }
 
 fn apply_autostart(enabled: bool) -> Result<(), String> {
@@ -618,6 +635,7 @@ fn main() {
             hide_palette,
             open_manager,
             open_manager_snippet,
+            confirm_text,
             execute_snippet,
             copy_snippet,
             copy_text,

@@ -59,6 +59,7 @@ export const api = {
   hidePalette: () => invoke<void>("hide_palette"),
   openManager: (tab: string | null) => invoke<void>("open_manager", { tab }),
   openManagerSnippet: (mode: "edit" | "copy", snippet: Snippet) => invoke<void>("open_manager_snippet", { mode, snippet }),
+  confirmText: () => invoke<string>("confirm_text"),
   sendTest: (text: string, mode: TypingMode, delayMs: number) => invoke<void>("send_test", { text, mode, delayMs }),
   fastkeysPath: () => invoke<string | null>("fastkeys_db_path"),
   parseFdb: (path: string) => invoke<ImportReport>("parse_fdb", { path }),

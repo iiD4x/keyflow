@@ -1,10 +1,17 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
+  import { api } from "$lib/api";
 
   let trigger = $state("");
 
   onMount(() => {
+    api
+      .confirmText()
+      .then((t) => {
+        if (t) trigger = t;
+      })
+      .catch(() => {});
     const un = listen("confirm-show", (e) => {
       trigger = String(e.payload ?? "");
     });

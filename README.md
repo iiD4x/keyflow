@@ -8,6 +8,22 @@ Type a trigger word anywhere and KeyFlow replaces it, and replacements can inclu
 
 KeyFlow is an independent project, not affiliated with or endorsed by FastKeys or asyar. The FastKeys importer reads a database file you already have on your machine, so existing rules can be carried over.
 
+## Screenshots
+
+![The Ctrl+Space palette with demo snippets, trigger-mode and typing-mode badges](docs/screenshots/palette.png)
+
+![Snippet context menu in the palette](docs/screenshots/palette-menu.png)
+
+![Snippet editor with the Insert action palette and live token preview](docs/screenshots/editor.png)
+
+![Confirmation prompt for a Confirm-mode snippet](docs/screenshots/confirm-prompt.png)
+
+![Settings window with the snippet list](docs/screenshots/manager.png)
+
+![Opening the palette and filtering the list](docs/screenshots/palette.gif)
+
+Screenshots use demo snippets only.
+
 ## Features
 
 - Global text expansion: case-insensitive triggers by default, with a per-snippet case sensitivity option

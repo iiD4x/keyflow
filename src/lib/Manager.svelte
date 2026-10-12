@@ -363,9 +363,13 @@
       }
       tick().then(() => triggerInput?.focus());
     });
+    const un3 = listen("config-updated", () => {
+      refresh();
+    });
     return () => {
       un.then((f) => f());
       un2.then((f) => f());
+      un3.then((f) => f());
     };
   });
 </script>

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3
+
+- Fixed: the confirmation prompt could appear with an empty trigger, because the confirm window was missing from the capability file and had no permission to receive events or call commands
+- Fixed: the Settings window did not refresh when the configuration changed on disk
+- Documentation: screenshots and an animated GIF of the palette with demo data
+
 ## 0.2.2
 
 - Repository metadata for public release: neutral application identifier (com.keyflow.app), MIT license, contributor author field
