@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.6
+
+- The FastKeys import card moved into the Backup tab, so importing, backing up and restoring live in one place
+- Fixed: the General settings rendered at the bottom of the Backup tab instead of the Settings tab
+
 ## 0.2.5
 
 - Backup tab: write snapshots of the configuration into a folder of your choice, with a native folder picker and one click to go back to the default location

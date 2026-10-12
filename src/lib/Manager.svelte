@@ -4,7 +4,7 @@
   import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { api, type BackupList, type ImportReport, type Snippet, type Status, type TypingMode } from "$lib/api";
 
-  type Tab = "snippets" | "import" | "backup" | "settings" | "about";
+  type Tab = "snippets" | "backup" | "settings" | "about";
 
   let tab = $state<Tab>("snippets");
   let snippets = $state<Snippet[]>([]);
@@ -33,7 +33,6 @@
   const modes: TypingMode[] = ["instant", "fast", "human", "slow"];
   const tabs: { id: Tab; label: string }[] = [
     { id: "snippets", label: "Snippets" },
-    { id: "import", label: "Import" },
     { id: "backup", label: "Backup" },
     { id: "settings", label: "Settings" },
     { id: "about", label: "About" }
@@ -353,8 +352,10 @@
         tab = "snippets";
         addNew();
         tick().then(() => triggerInput?.focus());
-      } else if (t === "snippets" || t === "import" || t === "settings" || t === "about") {
+      } else if (t === "snippets" || t === "backup" || t === "settings" || t === "about") {
         selectTab(t as Tab);
+      } else if (t === "import") {
+        selectTab("backup");
       }
     });
     const un2 = listen("manager-open-snippet", (e) => {
@@ -791,56 +792,6 @@
           {/if}
         </section>
       </div>
-    {:else if tab === "import"}
-      <div class="max-w-4xl">
-        <div class="rounded-xl border border-white/8 bg-white/[0.03] p-5">
-          <h2 class="mb-2 text-[14.5px] font-semibold">Import from FastKeys</h2>
-          <p class="mb-4 text-[13px] leading-relaxed text-white/50">
-            Reads your FastKeys phrase database (<span class="font-mono text-white/70">.fdb</span>) and converts its Send-style
-            entries into KeyFlow snippets. The original file is never modified.
-          </p>
-          <div class="mb-4 flex gap-2">
-            <input
-              bind:value={importPath}
-              spellcheck="false"
-              placeholder="Path to FASTKEYS.fdb"
-              class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-[12.5px] outline-none focus:border-[#5B8CFF]/60"
-            />
-            <button type="button" onclick={detectPath} class="shrink-0 rounded-lg bg-white/5 px-3.5 py-2 text-white/70 hover:bg-white/10">Detect</button>
-            <button type="button" onclick={parseFile} disabled={busy} class="shrink-0 rounded-lg bg-white/10 px-3.5 py-2 text-white/85 hover:bg-white/15">Parse</button>
-          </div>
-          {#if report}
-            <div class="mb-4 flex flex-wrap items-center gap-4">
-              <span class="text-white/60">{report.parsed} rules parsed from {report.total_lines} lines</span>
-              <label class="flex items-center gap-2 text-white/60"><input type="checkbox" bind:checked={replaceExisting} /> Replace existing triggers</label>
-              <button type="button" onclick={runImport} disabled={busy} class="rounded-lg bg-[#5B8CFF] px-4 py-2 font-medium text-white hover:bg-[#4a7cf5]">
-                Import {report.parsed} rules
-              </button>
-            </div>
-            <div class="max-h-[48vh] overflow-y-auto rounded-lg border border-white/8">
-              <table class="w-full text-left">
-                <thead class="sticky top-0 bg-[#14161e] text-[11px] uppercase tracking-wide text-white/35">
-                  <tr>
-                    <th class="px-3 py-2 font-semibold">Trigger</th>
-                    <th class="px-3 py-2 font-semibold">Name</th>
-                    <th class="px-3 py-2 font-semibold">Replacement preview</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each report.rules as r, i (r.trigger + "#" + i)}
-                    <tr class="border-t border-white/5">
-                      <td class="px-3 py-1.5 font-mono text-[12.5px]">{r.trigger}</td>
-                      <td class="px-3 py-1.5 text-white/45">{r.name}</td>
-                      <td class="px-3 py-1.5 font-mono text-[12px] text-white/40">{r.preview}</td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          {/if}
-        </div>
-      </div>
-    {:else if tab === "settings"}
     {:else if tab === "backup"}
       <div class="max-w-3xl space-y-4">
         <div class="rounded-xl border border-white/8 bg-white/[0.03] p-5">
@@ -917,8 +868,56 @@
             {/if}
           </div>
         {/if}
+        <div class="rounded-xl border border-white/8 bg-white/[0.03] p-5">
+          <h2 class="mb-2 text-[14.5px] font-semibold">Import from FastKeys</h2>
+          <p class="mb-4 text-[13px] leading-relaxed text-white/50">
+            Reads your FastKeys phrase database (<span class="font-mono text-white/70">.fdb</span>) and converts its Send-style
+            entries into KeyFlow snippets. The original file is never modified.
+          </p>
+          <div class="mb-4 flex gap-2">
+            <input
+              bind:value={importPath}
+              spellcheck="false"
+              placeholder="Path to FASTKEYS.fdb"
+              class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-[12.5px] outline-none focus:border-[#5B8CFF]/60"
+            />
+            <button type="button" onclick={detectPath} class="shrink-0 rounded-lg bg-white/5 px-3.5 py-2 text-white/70 hover:bg-white/10">Detect</button>
+            <button type="button" onclick={parseFile} disabled={busy} class="shrink-0 rounded-lg bg-white/10 px-3.5 py-2 text-white/85 hover:bg-white/15">Parse</button>
+          </div>
+          {#if report}
+            <div class="mb-4 flex flex-wrap items-center gap-4">
+              <span class="text-white/60">{report.parsed} rules parsed from {report.total_lines} lines</span>
+              <label class="flex items-center gap-2 text-white/60"><input type="checkbox" bind:checked={replaceExisting} /> Replace existing triggers</label>
+              <button type="button" onclick={runImport} disabled={busy} class="rounded-lg bg-[#5B8CFF] px-4 py-2 font-medium text-white hover:bg-[#4a7cf5]">
+                Import {report.parsed} rules
+              </button>
+            </div>
+            <div class="max-h-[48vh] overflow-y-auto rounded-lg border border-white/8">
+              <table class="w-full text-left">
+                <thead class="sticky top-0 bg-[#14161e] text-[11px] uppercase tracking-wide text-white/35">
+                  <tr>
+                    <th class="px-3 py-2 font-semibold">Trigger</th>
+                    <th class="px-3 py-2 font-semibold">Name</th>
+                    <th class="px-3 py-2 font-semibold">Replacement preview</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each report.rules as r, i (r.trigger + "#" + i)}
+                    <tr class="border-t border-white/5">
+                      <td class="px-3 py-1.5 font-mono text-[12.5px]">{r.trigger}</td>
+                      <td class="px-3 py-1.5 text-white/45">{r.name}</td>
+                      <td class="px-3 py-1.5 font-mono text-[12px] text-white/40">{r.preview}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        </div>
+
       </div>
 
+    {:else if tab === "settings"}
       <div class="max-w-2xl">
         {#if status}
           <div class="rounded-xl border border-white/8 bg-white/[0.03] p-5">

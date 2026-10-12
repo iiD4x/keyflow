@@ -54,7 +54,7 @@
     const all: ActionItem[] = [
       { kind: "action", id: "new", title: "New snippet…", sub: "Open the editor on a fresh trigger" },
       { kind: "action", id: "settings", title: "Open KeyFlow settings", sub: "Snippets, typing modes and import" },
-      { kind: "action", id: "import", title: "Import FastKeys rules", sub: "Open the import page in settings" },
+      { kind: "action", id: "import", title: "Import FastKeys rules", sub: "Backup and import live in the same tab" },
       {
         kind: "action",
         id: "pause",
@@ -146,7 +146,7 @@
     } else if (item.id === "settings") {
       await api.openManager(null);
     } else if (item.id === "import") {
-      await api.openManager("import");
+      await api.openManager("backup");
     } else if (item.id === "reload") {
       status = await api.reloadConfig();
       snippets = await api.listSnippets();
