@@ -821,7 +821,7 @@
             {:else}
               <svg class="h-[15px] w-[15px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
               {#if item.value}
-                <span class="text-[19px] font-semibold leading-none text-white/95">{item.value}</span>
+                <span class={["font-semibold leading-none tabular-nums whitespace-nowrap text-white/95", item.value.length >= 9 ? "text-[14px]" : "text-[19px]"].join(" ")}>{item.value}</span>
               {/if}
               <span class="line-clamp-2 max-w-full break-words text-[10px] font-medium uppercase leading-[1.15] tracking-wide text-white/40" title={item.label}>{item.label}</span>
               {#if item.sub}
@@ -915,7 +915,7 @@
         style={"left: " + tileMenu.x + "px; top: " + tileMenu.y + "px"}
         oncontextmenu={(e) => e.preventDefault()}
       >
-        {#if tw.kind === "weather" || tw.kind === "worldclock"}
+        {#if tw.kind === "weather" || tw.kind === "worldclock" || tw.kind === "clock"}
           <button type="button" onclick={() => openCfg(tw)} class="flex w-full items-center justify-between gap-3 px-3 py-[6px] text-left text-[13px] text-white/85 hover:bg-white/5">
             <span>Configure…</span>
             <span class="max-w-[110px] truncate text-[11px] text-white/30">{tw.kind === "weather" ? tw.city : tw.tz}</span>
