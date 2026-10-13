@@ -941,12 +941,21 @@
         <input
           bind:this={cfgEl}
           bind:value={cfgPanel.city}
-          placeholder="City, e.g. Riyadh"
+          placeholder="City, e.g. Riyadh" oninput={(e) => searchCities((e.currentTarget as HTMLInputElement).value)}
           spellcheck="false"
           onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCfg(); } }}
           class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-white/90 outline-none focus:border-[var(--accent)]"
         />
-        <p class="mt-2 text-[11.5px] leading-relaxed text-white/35">Weather comes from Open-Meteo. Only weather tiles make a network request.</p>
+        {#if cfgResults.length > 0}
+          <div class="mt-2 max-h-[168px] overflow-y-auto rounded-lg border border-white/10 bg-white/[0.03]">
+            {#each cfgResults as h, i (h.label + i)}
+              <button type="button" onclick={() => selectCity(h)} class="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left hover:bg-white/10">
+                <span class="min-w-0 truncate text-[12.5px] text-white/85">{h.label}</span>
+                <span class="shrink-0 font-mono text-[10.5px] text-white/30">{h.tz}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}        <p class="mt-2 text-[11.5px] leading-relaxed text-white/35">Weather comes from Open-Meteo. Only weather tiles make a network request.</p>
       {:else if cfgPanel.kind === 'worldclock'}
         <input
           bind:this={cfgEl}
