@@ -204,7 +204,8 @@
   function onEditorKey(e: KeyboardEvent) {
     const mod = e.ctrlKey || e.metaKey;
     if (!mod) return;
-    const k = e.key.toLowerCase();
+    // Match the physical key: with an Arabic layout e.key is "ن", not "n".
+    const k = e.code === "KeyZ" ? "z" : e.code === "KeyY" ? "y" : e.key.toLowerCase();
     if (k === "z") {
       e.preventDefault();
       if (e.shiftKey) redoEdit();

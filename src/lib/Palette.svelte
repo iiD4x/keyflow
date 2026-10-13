@@ -273,7 +273,7 @@
     } else if (e.key === "Enter") {
       e.preventDefault();
       activate(results[sel], e.ctrlKey || e.metaKey);
-    } else if (e.key.toLowerCase() === "n" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+    } else if ((e.code === "KeyN" || e.key.toLowerCase() === "n") && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       api.openManager("new");
     } else if (e.key === "Escape") {

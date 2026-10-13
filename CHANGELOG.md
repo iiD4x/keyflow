@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.8
+
+- Fixed: keyboard shortcuts match the physical key instead of the produced character. Ctrl+N in the palette and Ctrl+Z / Ctrl+Y in the editor kept working only on a Latin layout; with Arabic (or any non-Latin layout) the key arrives as a different character and the shortcut was ignored
+
 ## 0.2.7
 
 - Diagnostics: every start logs the version, executable path, data folder, config path and snippet count, and writes the same to last-start.txt

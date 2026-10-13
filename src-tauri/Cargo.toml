@@ -1,6 +1,6 @@
 [package]
 name = "keyflow"
-version = "0.2.7"
+version = "0.2.8"
 description = "KeyFlow - a local-first text expander for Windows with a Ctrl+Space palette"
 authors = ["KeyFlow contributors"]
 license = "MIT"
