@@ -33,6 +33,8 @@ export interface Status {
   exe_path: string;
   data_dir: string;
   widgets: Widget[];
+  dashboard: string[];
+  accent: string;
 }
 
 export interface Widget {
@@ -81,6 +83,8 @@ export const api = {
   setAutostart: (autostart: boolean) => invoke<Status>("set_autostart", { autostart }),
   reloadConfig: () => invoke<Status>("reload_config"),
   saveWidgets: (widgets: Widget[]) => invoke<Status>("save_widgets", { widgets }),
+  saveDashboard: (widgets: Widget[], order: string[]) => invoke<Status>("save_dashboard", { widgets, order }),
+  setAccent: (accent: string | null) => invoke<Status>("set_accent", { accent }),
   executeSnippet: (id: string) => invoke<void>("execute_snippet", { id }),
   copySnippet: (id: string) => invoke<void>("copy_snippet", { id }),
   copyText: (text: string) => invoke<void>("copy_text", { text }),

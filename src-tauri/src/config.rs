@@ -60,6 +60,9 @@ pub struct Settings {
     /// Folder for configuration backups. Absent or empty means the default folder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_dir: Option<String>,
+    /// Accent colour for the UI, any CSS colour string.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
 }
 
 impl Default for Settings {
@@ -69,6 +72,7 @@ impl Default for Settings {
             paused: false,
             autostart: false,
             backup_dir: None,
+            accent: None,
         }
     }
 }
@@ -81,6 +85,10 @@ pub struct Config {
     pub settings: Settings,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub widgets: Vec<Widget>,
+    /// Display order of the palette dashboard: action ids ("new", "settings",
+    /// "pause") mixed with widget ids.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dashboard: Vec<String>,
 }
 
 /// A tile on the palette dashboard: a live widget (clock, weather, ...) or an

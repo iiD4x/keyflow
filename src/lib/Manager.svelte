@@ -324,6 +324,15 @@
     flash("Settings saved");
   }
 
+  const accentPresets = ["#5B8CFF", "#8B5CF6", "#EC4899", "#F97316", "#22C55E", "#14B8A6", "#EAB308", "#EF4444"];
+
+  async function pickAccent(a: string) {
+    try {
+      status = await api.setAccent(a);
+    } catch (e) {
+      flash("Could not set the accent colour: " + String(e));
+    }
+  }
   async function toggleAutostart() {
     if (!status) return;
     try {
@@ -527,7 +536,7 @@
 
 </script>
 
-<div class="min-h-screen bg-[#0d0f14] text-[13.5px] text-white/90" oncontextmenu={(e) => e.preventDefault()}>
+<div class="min-h-screen bg-[#0d0f14] text-[13.5px] text-white/90" style={"--accent: " + (status?.accent ?? "#5B8CFF")} oncontextmenu={(e) => e.preventDefault()}>
   <header class="flex items-center gap-4 border-b border-white/8 px-5 py-3">
     <span class="text-[15px] font-semibold tracking-tight">KeyFlow</span>
     {#if status}<span class="text-[12px] text-white/30">v{status.version}</span>{/if}
@@ -561,9 +570,9 @@
               bind:value={filter}
               placeholder="Filter snippets…"
               spellcheck="false"
-              class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 outline-none focus:border-[#5B8CFF]/60"
+              class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 outline-none focus:border-[var(--accent)]"
             />
-            <button type="button" onclick={addNew} class="shrink-0 rounded-lg bg-[#5B8CFF] px-3.5 py-2 font-medium text-white hover:bg-[#4a7cf5]">New</button>
+            <button type="button" onclick={addNew} class="shrink-0 rounded-lg bg-[var(--accent)] px-3.5 py-2 font-medium text-white hover:brightness-110">New</button>
           </div>
           <div class="max-h-[64vh] overflow-y-auto rounded-xl border border-white/8 bg-white/[0.02]">
             {#each shown as s (s.id)}
@@ -606,7 +615,7 @@
                     bind:this={triggerInput}
                     oninput={scheduleHistory}
                     spellcheck="false"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono outline-none focus:border-[#5B8CFF]/60"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono outline-none focus:border-[var(--accent)]"
                   />
                 </label>
                 <label class="block">
@@ -651,7 +660,7 @@
                     const data = e.dataTransfer?.getData("text/plain") ?? "";
                     if (data) insertAtCaret(data, tokenAtPoint(e.clientX, e.clientY));
                   }}
-                  class={["w-full rounded-lg border bg-white/5 px-3 py-2 font-mono outline-none focus:border-[#5B8CFF]/60", dragOver ? "border-[#5B8CFF] ring-2 ring-[#5B8CFF]/30" : "border-white/10"].join(" ")}
+                  class={["w-full rounded-lg border bg-white/5 px-3 py-2 font-mono outline-none focus:border-[var(--accent)]", dragOver ? "border-[var(--accent)] ring-2 ring-[#5B8CFF]/30" : "border-white/10"].join(" ")}
                 ></textarea>
               </label>
               {#if editing.replacement}
@@ -660,7 +669,7 @@
                   {#each previewParts(editing.replacement) as part}
                     {#if part.isToken}
                       <span
-                        class={["rounded px-1.5 py-0.5 font-mono text-[11px]", isValidToken(part.text) ? "bg-[#5B8CFF]/20 text-[#9DB6FF]" : "bg-amber-400/15 text-amber-300"].join(" ")}
+                        class={["rounded px-1.5 py-0.5 font-mono text-[11px]", isValidToken(part.text) ? "bg-white/10 text-[var(--accent)]" : "bg-amber-400/15 text-amber-300"].join(" ")}
                         title={isValidToken(part.text) ? "Executes as an action" : "Not a known action - typed literally"}
                       >{part.text}</span>
                     {:else}
@@ -703,7 +712,7 @@
                     <button
                       type="button"
                       onclick={() => toggleMod(md.key)}
-                      class={["rounded-md border px-2 py-1 text-[11.5px]", comboMods[md.key] ? "border-[#5B8CFF]/60 bg-[#5B8CFF]/20 text-white" : "border-white/10 bg-white/5 text-white/50 hover:bg-white/10"].join(" ")}
+                      class={["rounded-md border px-2 py-1 text-[11.5px]", comboMods[md.key] ? "border-[var(--accent)] bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/50 hover:bg-white/10"].join(" ")}
                     >{md.label}</button>
                   {/each}
                   <select bind:value={comboKey} class="rounded-md border border-white/10 bg-[#171a22] px-1.5 py-1 text-[11.5px] text-white/60 outline-none">
@@ -720,7 +729,7 @@
                       e.dataTransfer?.setData("text/plain", comboToken);
                       if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
                     }}
-                    class="cursor-grab rounded-md border border-[#5B8CFF]/40 bg-[#5B8CFF]/15 px-2 py-1 font-mono text-[11.5px] text-[#9DB6FF] hover:bg-[#5B8CFF]/25 active:cursor-grabbing"
+                    class="cursor-grab rounded-md border border-[var(--accent)]/40 bg-white/10 px-2 py-1 font-mono text-[11.5px] text-[var(--accent)] hover:bg-[var(--accent)]/25 active:cursor-grabbing"
                   >{comboToken}</button>
                 </div>
 
@@ -766,7 +775,7 @@
                 </label>
               </div>
               <div class="flex gap-2 pt-1">
-                <button type="button" onclick={save} class="rounded-lg bg-[#5B8CFF] px-4 py-2 font-medium text-white hover:bg-[#4a7cf5]">Save</button>
+                <button type="button" onclick={save} class="rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:brightness-110">Save</button>
                 <button type="button" onclick={() => (editing = null)} class="rounded-lg bg-white/5 px-4 py-2 text-white/70 hover:bg-white/10">Cancel</button>
                 <button
                   type="button"
@@ -821,7 +830,7 @@
               {/if}
             </div>
             <div class="flex flex-wrap gap-2">
-              <button type="button" onclick={backupNow} disabled={busy} class="rounded-lg bg-[#5B8CFF] px-4 py-2 font-medium text-white hover:bg-[#4a7cf5]">Back up now</button>
+              <button type="button" onclick={backupNow} disabled={busy} class="rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:brightness-110">Back up now</button>
               <button type="button" onclick={backupCopy} class="rounded-lg bg-white/5 px-4 py-2 text-white/75 hover:bg-white/10">Save a copy…</button>
               <button type="button" onclick={pickRestoreFile} class="rounded-lg bg-white/5 px-4 py-2 text-white/75 hover:bg-white/10">Restore from file…</button>
             </div>
@@ -880,7 +889,7 @@
               bind:value={importPath}
               spellcheck="false"
               placeholder="Path to FASTKEYS.fdb"
-              class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-[12.5px] outline-none focus:border-[#5B8CFF]/60"
+              class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-[12.5px] outline-none focus:border-[var(--accent)]"
             />
             <button type="button" onclick={detectPath} class="shrink-0 rounded-lg bg-white/5 px-3.5 py-2 text-white/70 hover:bg-white/10">Detect</button>
             <button type="button" onclick={parseFile} disabled={busy} class="shrink-0 rounded-lg bg-white/10 px-3.5 py-2 text-white/85 hover:bg-white/15">Parse</button>
@@ -889,7 +898,7 @@
             <div class="mb-4 flex flex-wrap items-center gap-4">
               <span class="text-white/60">{report.parsed} rules parsed from {report.total_lines} lines</span>
               <label class="flex items-center gap-2 text-white/60"><input type="checkbox" bind:checked={replaceExisting} /> Replace existing triggers</label>
-              <button type="button" onclick={runImport} disabled={busy} class="rounded-lg bg-[#5B8CFF] px-4 py-2 font-medium text-white hover:bg-[#4a7cf5]">
+              <button type="button" onclick={runImport} disabled={busy} class="rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:brightness-110">
                 Import {report.parsed} rules
               </button>
             </div>
@@ -955,8 +964,16 @@
                 </span>
               </div>
             </div>
-            <div class="flex gap-2 pt-4">
-              <button type="button" onclick={saveSettings} class="rounded-lg bg-[#5B8CFF] px-4 py-2 font-medium text-white hover:bg-[#4a7cf5]">Save</button>
+            <div class="flex items-center justify-between gap-6 py-3.5">
+              <span class="text-white/75">Accent colour</span>
+              <span class="flex items-center gap-1.5">
+                {#each accentPresets as a (a)}
+                  <button type="button" onclick={() => pickAccent(a)} title={a} style={"background: " + a} class={["h-6 w-6 rounded-full border transition", (status?.accent ?? "#5B8CFF").toLowerCase() === a.toLowerCase() ? "scale-110 border-white/70" : "border-white/15 hover:border-white/40"].join(" ")}></button>
+                {/each}
+                <input type="color" value={status?.accent ?? "#5B8CFF"} oninput={(e) => pickAccent((e.currentTarget as HTMLInputElement).value)} title="Custom colour" class="h-6 w-9 cursor-pointer rounded border border-white/15 bg-transparent" />
+              </span>
+            </div>            <div class="flex gap-2 pt-4">
+              <button type="button" onclick={saveSettings} class="rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:brightness-110">Save</button>
               <button
                 type="button"
                 onclick={async () => {

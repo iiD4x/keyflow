@@ -46,6 +46,8 @@ struct Status {
     exe_path: String,
     data_dir: String,
     widgets: Vec<Widget>,
+    dashboard: Vec<String>,
+    accent: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -101,6 +103,8 @@ fn status_of(app: &AppHandle) -> Status {
             .unwrap_or_else(|_| "unknown".to_string()),
         data_dir: config::data_dir().display().to_string(),
         widgets: cfg.widgets.clone(),
+        dashboard: cfg.dashboard.clone(),
+        accent: cfg.settings.accent.clone().unwrap_or_else(|| "#5B8CFF".to_string()),
     }
 }
 
@@ -395,6 +399,37 @@ fn save_widgets(app: AppHandle, state: tauri::State<AppState>, widgets: Vec<Widg
     {
         let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
         cfg.widgets = widgets;
+        cfg.save().map_err(|e| e.to_string())?;
+    }
+    let _ = app.emit("config-updated", ());
+    Ok(status_of(&app))
+}
+
+#[tauri::command]
+fn save_dashboard(
+    app: AppHandle,
+    state: tauri::State<AppState>,
+    widgets: Vec<Widget>,
+    order: Vec<String>,
+) -> Result<Status, String> {
+    {
+        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        cfg.widgets = widgets;
+        cfg.dashboard = order;
+        cfg.save().map_err(|e| e.to_string())?;
+    }
+    let _ = app.emit("config-updated", ());
+    Ok(status_of(&app))
+}
+
+#[tauri::command]
+fn set_accent(app: AppHandle, state: tauri::State<AppState>, accent: Option<String>) -> Result<Status, String> {
+    {
+        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        cfg.settings.accent = accent.and_then(|a| {
+            let t = a.trim().to_string();
+            if t.is_empty() { None } else { Some(t) }
+        });
         cfg.save().map_err(|e| e.to_string())?;
     }
     let _ = app.emit("config-updated", ());
@@ -782,6 +817,8 @@ fn main() {
             set_autostart,
             reload_config,
             save_widgets,
+            save_dashboard,
+            set_accent,
             hide_palette,
             open_manager,
             open_manager_snippet,

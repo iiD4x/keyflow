@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+- The Settings tile shows a proper gear instead of a starburst
+- Clock tiles show seconds, with the local city underneath instead of a meaningless label
+- World clock takes a city name and shows it, for example Halifax, Canada, with the time for that city
+- Widget tiles use the same accent colour as the action tiles
+- Accent colour is configurable in Settings with presets and a custom picker, and applies to both windows
+- Dashboard tiles can be reordered freely, including between the action tiles: long-press and drag a tile, or right-click and use Move left / Move right
+- Dashboard order and widget settings are stored in config.json
+
 ## 0.2.9
 
 - The palette dashboard is now a grid of rounded square tiles instead of a row list

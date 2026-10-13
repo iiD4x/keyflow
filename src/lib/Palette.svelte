@@ -29,6 +29,11 @@
   let addMenu = $state<{ x: number; y: number } | null>(null);
   let cfgPanel = $state<{ id: string; kind: string; city: string; tz: string } | null>(null);
   let cfgEl = $state<HTMLInputElement>();
+  let localOrder = $state<string[] | null>(null);
+  let zones = $state<Record<string, string>>({});
+  let dragging = $state<string | null>(null);
+  let pressTimer: ReturnType<typeof setTimeout> | null = null;
+  let suppressClick = false;
 
   const modeOptions: { label: string; value: TypingMode | null }[] = [
     { label: "Auto", value: null },
@@ -118,6 +123,7 @@
     play: '<path d="M8 5l11 7-11 7z"></path>',
     import: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path>',
     reload: '<path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"></path>',
+    cog: '<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>',
     clock: '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
     date: '<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M3 10h18"></path>',
     weather: '<path d="M7 18h9a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.5 1.5A3.5 3.5 0 0 0 7 18z"></path>',
@@ -151,6 +157,8 @@
 
   const widgets = $derived(status?.widgets ?? []);
 
+  const effectiveOrder = $derived(localOrder ?? status?.dashboard ?? []);
+
   function seg(path: string): string {
     const parts = path.split("/");
     return (parts[parts.length - 1] ?? path).replace(/_/g, " ");
@@ -164,43 +172,70 @@
     }
   };
 
+  function actionTile(id: string): Tile | null {
+    if (!status) return null;
+    if (id === "new") {
+      return { id: "new", kind: "tile", tkind: "action", action: "new", icon: "plus", label: "New snippet", value: "", sub: "", configurable: false };
+    }
+    if (id === "settings") {
+      return { id: "settings", kind: "tile", tkind: "action", action: "settings", icon: "cog", label: "Settings", value: "", sub: "", configurable: false };
+    }
+    if (id === "pause") {
+      return { id: "pause", kind: "tile", tkind: "action", action: "pause", icon: status.paused ? "play" : "pause", label: status.paused ? "Resume" : "Pause", value: "", sub: "", configurable: false };
+    }
+    return null;
+  }
+
+  function localZoneCity(): string {
+    try {
+      return seg(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+    } catch {
+      return "";
+    }
+  }
+
+  function widgetTile(w: Widget): Tile | null {
+    if (w.kind === "clock") {
+      return { id: w.id, kind: "tile", tkind: "widget", wkind: "clock", icon: "clock", label: "Clock", value: fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }), sub: localZoneCity(), configurable: false };
+    }
+    if (w.kind === "date") {
+      return { id: w.id, kind: "tile", tkind: "widget", wkind: "date", icon: "date", label: "Date", value: fmt({ day: "numeric", month: "short" }), sub: fmt({ weekday: "long" }), configurable: false };
+    }
+    if (w.kind === "weather") {
+      const st = weather[w.id];
+      const temp = st && typeof st.temp === "number" ? Math.round(st.temp) + "°" : "—";
+      const sub = !st ? "…" : st.error && st.error !== "loading" ? st.error : st.code != null ? WMO[st.code] ?? "—" : "loading…";
+      return { id: w.id, kind: "tile", tkind: "widget", wkind: "weather", icon: "weather", label: (w.city || "City").trim(), value: temp, sub, configurable: true };
+    }
+    if (w.kind === "worldclock") {
+      const tz = w.tz || "UTC";
+      return { id: w.id, kind: "tile", tkind: "widget", wkind: "worldclock", icon: "globe", label: w.city || seg(tz), value: fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }, tz), sub: fmt({ weekday: "short" }, tz), configurable: true };
+    }
+    if (w.kind === "import") {
+      return { id: w.id, kind: "tile", tkind: "widget", wkind: "import", icon: "import", label: "Import", value: "", sub: "FastKeys", configurable: false };
+    }
+    if (w.kind === "reload") {
+      return { id: w.id, kind: "tile", tkind: "widget", wkind: "reload", icon: "reload", label: "Reload", value: "", sub: "config", configurable: false };
+    }
+    return null;
+  }
+
   const tiles = $derived.by((): Tile[] => {
     if (!status) return [];
-    const out: Tile[] = [
-      { id: "new", kind: "tile", tkind: "action", action: "new", icon: "plus", label: "New snippet", value: "", sub: "", configurable: false },
-      { id: "settings", kind: "tile", tkind: "action", action: "settings", icon: "gear", label: "Settings", value: "", sub: "", configurable: false },
-      {
-        id: "pause",
-        kind: "tile",
-        tkind: "action",
-        action: "pause",
-        icon: status.paused ? "play" : "pause",
-        label: status.paused ? "Resume" : "Pause",
-        value: "",
-        sub: "",
-        configurable: false
+    const out: Tile[] = [];
+    const seen = new Set<string>();
+    const push = (t: Tile | null) => {
+      if (t) {
+        out.push(t);
+        seen.add(t.id);
       }
-    ];
-
-    for (const w of status.widgets ?? []) {
-      if (w.kind === "clock") {
-        out.push({ id: w.id, kind: "tile", tkind: "widget", wkind: "clock", icon: "clock", label: "Clock", value: fmt({ hour: "2-digit", minute: "2-digit", hour12: false }), sub: fmt({ second: "2-digit" }) + "s", configurable: false });
-      } else if (w.kind === "date") {
-        out.push({ id: w.id, kind: "tile", tkind: "widget", wkind: "date", icon: "date", label: "Date", value: fmt({ day: "numeric", month: "short" }), sub: fmt({ weekday: "long" }), configurable: false });
-      } else if (w.kind === "weather") {
-        const st = weather[w.id];
-        const temp = st && typeof st.temp === "number" ? Math.round(st.temp) + "°" : "—";
-        const sub = !st ? "…" : st.error && st.error !== "loading" ? st.error : st.code != null ? WMO[st.code] ?? "—" : "loading…";
-        out.push({ id: w.id, kind: "tile", tkind: "widget", wkind: "weather", icon: "weather", label: (w.city || "City").trim(), value: temp, sub, configurable: true });
-      } else if (w.kind === "worldclock") {
-        out.push({ id: w.id, kind: "tile", tkind: "widget", wkind: "worldclock", icon: "globe", label: seg(w.tz || "UTC"), value: fmt({ hour: "2-digit", minute: "2-digit", hour12: false }, w.tz || "UTC"), sub: fmt({ weekday: "short" }, w.tz || "UTC"), configurable: true });
-      } else if (w.kind === "import") {
-        out.push({ id: w.id, kind: "tile", tkind: "widget", wkind: "import", icon: "import", label: "Import", value: "", sub: "FastKeys", configurable: false });
-      } else if (w.kind === "reload") {
-        out.push({ id: w.id, kind: "tile", tkind: "widget", wkind: "reload", icon: "reload", label: "Reload", value: "", sub: "config", configurable: false });
-      }
+    };
+    for (const id of effectiveOrder) {
+      const w = (status.widgets ?? []).find((x) => x.id === id);
+      push(w ? widgetTile(w) : actionTile(id));
     }
-
+    for (const a of ["new", "settings", "pause"]) if (!seen.has(a)) push(actionTile(a));
+    for (const w of status.widgets ?? []) if (!seen.has(w.id)) push(widgetTile(w));
     const q = query.trim().toLowerCase();
     const shown = !q ? out : out.filter((t) => (t.label + " " + t.sub + " " + t.value).toLowerCase().includes(q));
     return [...shown, { id: "add", kind: "tile", tkind: "add", icon: "plus", label: "Add", value: "", sub: "widget", configurable: false }];
@@ -401,13 +436,97 @@
       // the palette stays usable even if the write fails
     }
   }
+  function order(): string[] {
+    return tiles.filter((t) => t.tkind !== "add").map((t) => t.id);
+  }
+
+  async function persist(widgetsNext: Widget[], orderNext: string[]): Promise<void> {
+    try {
+      status = await api.saveDashboard(widgetsNext, orderNext);
+    } catch {
+      // the palette stays usable even if the write fails
+    }
+  }
+
+  async function resolveZones(): Promise<void> {
+    for (const w of widgets) {
+      if (w.kind !== "worldclock") continue;
+      const city = (w.city ?? "").trim();
+      if (!city) continue;
+      const st = zones[w.id];
+      if (st === "loading" || st === "done") continue;
+      if (w.tz && !st) {
+        zones = { ...zones, [w.id]: "done" };
+        continue;
+      }
+      zones = { ...zones, [w.id]: "loading" };
+      try {
+        const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + encodeURIComponent(city)).then((r) => r.json());
+        const hit = geo?.results?.[0];
+        if (hit?.timezone) {
+          const label = hit.country ? hit.name + ", " + hit.country : hit.name;
+          await persist(widgets.map((x) => (x.id === w.id ? { ...x, tz: hit.timezone, city: label } : x)), order());
+        }
+        zones = { ...zones, [w.id]: "done" };
+      } catch {
+        zones = { ...zones, [w.id]: "error" };
+      }
+    }
+  }
+
+  function tileIndexAt(x: number, y: number): number {
+    const el = gridEl;
+    if (!el) return -1;
+    const kids = Array.from(el.children) as HTMLElement[];
+    for (let i = 0; i < kids.length; i++) {
+      const r = kids[i].getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i;
+    }
+    return -1;
+  }
+
+  function onTileDown(item: Tile, e: PointerEvent): void {
+    if (item.tkind === "add") return;
+    if (pressTimer) clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => {
+      dragging = item.id;
+      suppressClick = true;
+      localOrder = order();
+    }, 320);
+  }
+
+  function onTileMove(e: PointerEvent): void {
+    if (!dragging) return;
+    const idx = tileIndexAt(e.clientX, e.clientY);
+    if (idx < 0) return;
+    const list = (localOrder ?? order()).slice();
+    const from = list.indexOf(dragging);
+    if (from < 0) return;
+    const target = Math.min(idx, list.length - 1);
+    if (from === target) return;
+    list.splice(target, 0, list.splice(from, 1)[0]);
+    localOrder = list;
+  }
+
+  function onTileUp(): void {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    if (dragging && localOrder) {
+      const next = localOrder;
+      localOrder = null;
+      void persist(widgets, next);
+    }
+    dragging = null;
+  }
 
   function addWidget(kind: string): void {
     const w: Widget = { id: "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), kind };
     if (kind === "weather") w.city = "Riyadh";
-    if (kind === "worldclock") w.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    if (kind === "worldclock") w.city = "Riyadh";
     addMenu = null;
-    void saveWidgets([...widgets, w]);
+    void persist([...widgets, w], [...order(), w.id]);
     if (kind === "weather" || kind === "worldclock") openCfg(w);
   }
 
@@ -420,7 +539,7 @@
 
   function removeWidget(id: string): void {
     tileMenu = null;
-    void saveWidgets(widgets.filter((w) => w.id !== id));
+    void persist(widgets.filter((w) => w.id !== id), order().filter((x) => x !== id));
   }
 
   function moveWidget(id: string, dir: number): void {
@@ -432,14 +551,20 @@
     const tmp = list[i];
     list[i] = list[j];
     list[j] = tmp;
-    void saveWidgets(list);
+    const ord = order();
+    const a = ord.indexOf(id);
+    if (a < 0) return;
+    const b = a + dir;
+    if (b < 0 || b >= ord.length) return;
+    ord.splice(b, 0, ord.splice(a, 1)[0]);
+    void persist(list, ord);
   }
 
   function commitCfg(): void {
     const c = cfgPanel;
     if (!c) return;
     cfgPanel = null;
-    void saveWidgets(widgets.map((w) => (w.id === c.id ? { ...w, city: c.city.trim(), tz: c.tz.trim() || w.tz } : w)));
+    void persist(widgets.map((w) => (w.id === c.id ? { ...w, city: c.city.trim(), tz: w.kind === "worldclock" ? "" : c.tz.trim() || w.tz } : w)), order());
   }
 
   async function fetchWeather(): Promise<void> {
@@ -502,6 +627,7 @@
     const sig = widgets.map((w) => w.id + ":" + w.kind + ":" + (w.city ?? "") + ":" + (w.tz ?? "")).join("|");
     if (!sig) return;
     void fetchWeather();
+    void resolveZones();
   });
 
   function onKey(e: KeyboardEvent) {
@@ -589,6 +715,7 @@
 
 <div
   class="relative flex h-screen w-screen flex-col overflow-hidden rounded-2xl border border-white/10 bg-[rgba(15,17,24,0.72)] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+  style={"--accent: " + (status?.accent ?? "#5B8CFF")}
   oncontextmenu={(e) => e.preventDefault()}
 >
   <div class="flex items-center gap-3 px-5 pt-4 pb-3">
@@ -624,9 +751,20 @@
           <button
             type="button"
             onmouseenter={() => (sel = i)}
-            onclick={(e) => (item.tkind === "add" ? openAddMenu(e) : activate(item))}
+            onpointerdown={(e) => onTileDown(item, e)}
+            onpointermove={onTileMove}
+            onpointerup={onTileUp}
+            onpointercancel={onTileUp}
+            onclick={(e) => {
+              if (suppressClick) {
+                suppressClick = false;
+                return;
+              }
+              if (item.tkind === "add") openAddMenu(e);
+              else activate(item);
+            }}
             oncontextmenu={(e) => (item.tkind === "add" ? openAddMenu(e) : item.tkind === "widget" ? openTileMenu(e, item.id) : e.preventDefault())}
-            class={["group flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 text-center transition", i === sel ? "border-[#5B8CFF]/60 bg-[#5B8CFF]/12" : "border-white/8 bg-white/[0.04] hover:border-white/15 hover:bg-white/[0.07]"].join(" ")}
+            class={["group flex aspect-square select-none flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 text-center transition", dragging === item.id ? "scale-105 border-[var(--accent)] bg-white/[0.12] shadow-lg" : i === sel ? "border-[var(--accent)] bg-white/[0.08]" : "border-white/8 bg-white/[0.04] hover:border-white/15 hover:bg-white/[0.07]"].join(" ")}
           >
             {#if item.tkind === "add"}
               <span class="flex h-7 w-7 items-center justify-center rounded-xl border border-dashed border-white/25 text-white/40 group-hover:border-white/45 group-hover:text-white/75">
@@ -634,10 +772,12 @@
               </span>
               <span class="text-[10.5px] font-medium uppercase tracking-wide text-white/40">Add</span>
             {:else if item.tkind === "action"}
-              <svg class="h-[26px] w-[26px] text-[#9DB6FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
+              <svg class="h-[26px] w-[26px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
+              <svg class="h-[26px] w-[26px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
               <span class="max-w-full truncate text-[11px] font-medium leading-tight text-white/75">{item.label}</span>
             {:else}
               <svg class="h-[15px] w-[15px] text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
+              <svg class="h-[15px] w-[15px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
               {#if item.value}
                 <span class="text-[19px] font-semibold leading-none text-white/95">{item.value}</span>
               {/if}
@@ -662,7 +802,7 @@
           oncontextmenu={(e) => openMenuAtCursor(e, item.id)}
           class={["flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left", tiles.length + i === sel ? "bg-white/8" : "hover:bg-white/5"].join(" ")}
         >
-          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#5B8CFF]/15 text-[#9DB6FF]">
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-[var(--accent)]">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <path d="M4 8h9M4 12h6M4 16h9"></path>
               <path d="m16 6 3 3-3 3"></path>
@@ -762,7 +902,7 @@
           placeholder="City, e.g. Riyadh"
           spellcheck="false"
           onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCfg(); } }}
-          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-white/90 outline-none focus:border-[#5B8CFF]/60"
+          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-white/90 outline-none focus:border-[var(--accent)]"
         />
         <p class="mt-2 text-[11.5px] leading-relaxed text-white/35">Weather comes from Open-Meteo. Only weather tiles make a network request.</p>
       {:else}
@@ -772,7 +912,7 @@
           placeholder="Area/City, e.g. Asia/Tokyo"
           spellcheck="false"
           onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCfg(); } }}
-          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-[12.5px] text-white/90 outline-none focus:border-[#5B8CFF]/60"
+          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-[12.5px] text-white/90 outline-none focus:border-[var(--accent)]"
         />
         <div class="mt-2 flex flex-wrap gap-1.5">
           {#each QUICK_TZ as z (z)}
@@ -782,7 +922,7 @@
       {/if}
       <div class="mt-4 flex justify-end gap-2">
         <button type="button" onclick={() => (cfgPanel = null)} class="rounded-lg bg-white/5 px-3 py-1.5 text-[12.5px] text-white/60 hover:bg-white/10">Cancel</button>
-        <button type="button" onclick={commitCfg} class="rounded-lg bg-[#5B8CFF] px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:bg-[#4a7cf5]">Save</button>
+        <button type="button" onclick={commitCfg} class="rounded-lg bg-[var(--accent)] px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:brightness-110">Save</button>
       </div>
     </div>
   {/if}
@@ -811,7 +951,7 @@
               <button
                 type="button"
                 onclick={() => setMode(mo.value)}
-                class={["flex-1 rounded-md border px-1 py-1 text-[11px]", (menuSnippet.mode ?? null) === mo.value ? "border-[#5B8CFF]/60 bg-[#5B8CFF]/20 text-white" : "border-white/5 bg-white/5 text-white/50 hover:bg-white/10"].join(" ")}
+                class={["flex-1 rounded-md border px-1 py-1 text-[11px]", (menuSnippet.mode ?? null) === mo.value ? "border-[var(--accent)] bg-white/10 text-white" : "border-white/5 bg-white/5 text-white/50 hover:bg-white/10"].join(" ")}
               >{mo.label}</button>
             {/each}
           </div>
@@ -822,7 +962,7 @@
               <button
                 type="button"
                 onclick={() => setTriggerMode(tm.value)}
-                class={["flex-1 rounded-md border px-1 py-1 text-[10.5px]", (menuSnippet.trigger_mode ?? "auto") === tm.value ? "border-[#5B8CFF]/60 bg-[#5B8CFF]/20 text-white" : "border-white/5 bg-white/5 text-white/50 hover:bg-white/10"].join(" ")}
+                class={["flex-1 rounded-md border px-1 py-1 text-[10.5px]", (menuSnippet.trigger_mode ?? "auto") === tm.value ? "border-[var(--accent)] bg-white/10 text-white" : "border-white/5 bg-white/5 text-white/50 hover:bg-white/10"].join(" ")}
               >{tm.label}</button>
             {/each}
           </div>
@@ -844,7 +984,7 @@
           >
             <span class="flex items-center gap-2">
               {#if mi.kind === "toggle"}
-                <span class={["inline-block h-3.5 w-3.5 rounded-[4px] border text-center text-[10px] leading-[13px]", mi.checked ? "border-[#5B8CFF] bg-[#5B8CFF]/30 text-white" : "border-white/20 text-transparent"].join(" ")}>✓</span>
+                <span class={["inline-block h-3.5 w-3.5 rounded-[4px] border text-center text-[10px] leading-[13px]", mi.checked ? "border-[var(--accent)] bg-[var(--accent)]/30 text-white" : "border-white/20 text-transparent"].join(" ")}>✓</span>
               {/if}
               <span class="text-white/85">{mi.label}</span>
             </span>
