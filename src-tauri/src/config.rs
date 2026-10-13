@@ -102,6 +102,9 @@ pub struct Widget {
     pub city: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub tz: String,
+    /// Show the clock in 12-hour form instead of 24-hour.
+    #[serde(default)]
+    pub hour12: bool,
 }
 
 pub fn data_dir() -> PathBuf {

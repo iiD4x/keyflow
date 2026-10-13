@@ -42,6 +42,7 @@ export interface Widget {
   kind: string;
   city?: string;
   tz?: string;
+  hour12?: boolean;
 }
 
 export interface BackupEntry {

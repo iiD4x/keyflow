@@ -27,7 +27,7 @@
   let weather = $state<Record<string, { temp: number | null; code: number | null; error: string; at: number }>>({});
   let tileMenu = $state<{ x: number; y: number; id: string } | null>(null);
   let addMenu = $state<{ x: number; y: number } | null>(null);
-  let cfgPanel = $state<{ id: string; kind: string; city: string; tz: string } | null>(null);
+  let cfgPanel = $state<{ id: string; kind: string; city: string; tz: string; hour12: boolean } | null>(null);
   let cfgEl = $state<HTMLInputElement>();
   let localOrder = $state<string[] | null>(null);
   let zones = $state<Record<string, string>>({});
@@ -196,7 +196,7 @@
 
   function widgetTile(w: Widget): Tile | null {
     if (w.kind === "clock") {
-      return { id: w.id, kind: "tile", tkind: "widget", wkind: "clock", icon: "clock", label: "Clock", value: fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }), sub: localZoneCity(), configurable: false };
+      return { id: w.id, kind: "tile", tkind: "widget", wkind: "clock", icon: "clock", label: "Clock", value: fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: w.hour12 === true }), sub: localZoneCity(), configurable: true };
     }
     if (w.kind === "date") {
       return { id: w.id, kind: "tile", tkind: "widget", wkind: "date", icon: "date", label: "Date", value: fmt({ day: "numeric", month: "short" }), sub: fmt({ weekday: "long" }), configurable: false };
@@ -209,7 +209,7 @@
     }
     if (w.kind === "worldclock") {
       const tz = w.tz || "UTC";
-      return { id: w.id, kind: "tile", tkind: "widget", wkind: "worldclock", icon: "globe", label: w.city || seg(tz), value: fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }, tz), sub: fmt({ weekday: "short" }, tz), configurable: true };
+      return { id: w.id, kind: "tile", tkind: "widget", wkind: "worldclock", icon: "globe", label: w.city || seg(tz), value: fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: w.hour12 === true }, tz), sub: fmt({ weekday: "short" }, tz), configurable: true };
     }
     if (w.kind === "import") {
       return { id: w.id, kind: "tile", tkind: "widget", wkind: "import", icon: "import", label: "Import", value: "", sub: "FastKeys", configurable: false };
@@ -567,10 +567,10 @@
     if (!c || !hit.tz) return;
     cfgPanel = null;
     cfgResults = [];
-    void persist(widgets.map((w) => (w.id === c.id ? { ...w, city: hit.label, tz: hit.tz } : w)), order());
+    void persist(widgets.map((w) => (w.id === c.id ? { ...w, city: hit.label, tz: hit.tz, hour12: c.hour12 } : w)), order());
   }
   function openCfg(w: Widget): void {
-    cfgPanel = { id: w.id, kind: w.kind, city: w.city ?? "", tz: w.tz ?? "" };
+    cfgPanel = { id: w.id, kind: w.kind, city: w.city ?? "", tz: w.tz ?? "", hour12: w.hour12 === true };
     tileMenu = null;
     addMenu = null;
     setTimeout(() => cfgEl?.focus(), 40);
@@ -603,7 +603,7 @@
     const c = cfgPanel;
     if (!c) return;
     cfgPanel = null;
-    void persist(widgets.map((w) => (w.id === c.id ? { ...w, city: c.city.trim(), tz: w.kind === "worldclock" ? "" : c.tz.trim() || w.tz } : w)), order());
+    void persist(widgets.map((w) => (w.id === c.id ? { ...w, hour12: c.hour12, city: w.kind === "clock" ? w.city : c.city.trim(), tz: w.kind === "clock" ? "" : c.tz.trim() || w.tz } : w)), order());
   }
 
   async function fetchWeather(): Promise<void> {
@@ -823,7 +823,7 @@
               {#if item.value}
                 <span class="text-[19px] font-semibold leading-none text-white/95">{item.value}</span>
               {/if}
-              <span class="max-w-full truncate text-[10.5px] font-medium uppercase tracking-wide text-white/40">{item.label}</span>
+              <span class="line-clamp-2 max-w-full break-words text-[10px] font-medium uppercase leading-[1.15] tracking-wide text-white/40" title={item.label}>{item.label}</span>
               {#if item.sub}
                 <span class="max-w-full truncate text-[10px] leading-none text-white/30">{item.sub}</span>
               {/if}
@@ -936,7 +936,7 @@
       class="absolute left-1/2 top-1/2 z-50 w-[344px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/10 bg-[rgba(20,22,30,0.98)] p-4 shadow-[0_24px_64px_rgba(0,0,0,0.7)]"
       oncontextmenu={(e) => e.preventDefault()}
     >
-      <div class="mb-3 text-[13.5px] font-semibold text-white/90">{cfgPanel.kind === "weather" ? "Weather location" : "Time zone"}</div>
+      <div class="mb-3 text-[13.5px] font-semibold text-white/90">{cfgPanel.kind === "weather" ? "Weather location" : cfgPanel.kind === "clock" ? "Clock" : "City"}</div>
       {#if cfgPanel.kind === "weather"}
         <input
           bind:this={cfgEl}
@@ -947,7 +947,7 @@
           class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-white/90 outline-none focus:border-[var(--accent)]"
         />
         <p class="mt-2 text-[11.5px] leading-relaxed text-white/35">Weather comes from Open-Meteo. Only weather tiles make a network request.</p>
-      {:else}
+      {:else if cfgPanel.kind === 'worldclock'}
         <input
           bind:this={cfgEl}
           bind:value={cfgPanel.city}
@@ -971,7 +971,15 @@
           {/each}
         </div>
       {/if}
-      <div class="mt-4 flex justify-end gap-2">
+      {#if cfgPanel.kind === 'clock' || cfgPanel.kind === 'worldclock'}
+        <div class="mt-3">
+          <div class="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/30">Time format</div>
+          <div class="flex gap-1.5">
+            <button type="button" onclick={() => cfgPanel && (cfgPanel.hour12 = false)} class={["rounded-md border px-3 py-1 text-[12px]", cfgPanel.hour12 ? "border-white/10 bg-white/5 text-white/55 hover:bg-white/10" : "border-[var(--accent)] bg-white/10 text-white"].join(" ")}>24-hour</button>
+            <button type="button" onclick={() => cfgPanel && (cfgPanel.hour12 = true)} class={["rounded-md border px-3 py-1 text-[12px]", cfgPanel.hour12 ? "border-[var(--accent)] bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10"].join(" ")}>12-hour</button>
+          </div>
+        </div>
+      {/if}      <div class="mt-4 flex justify-end gap-2">
         <button type="button" onclick={() => (cfgPanel = null)} class="rounded-lg bg-white/5 px-3 py-1.5 text-[12.5px] text-white/60 hover:bg-white/10">Cancel</button>
         <button type="button" onclick={commitCfg} class="rounded-lg bg-[var(--accent)] px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:brightness-110">Save</button>
       </div>
