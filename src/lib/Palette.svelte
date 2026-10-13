@@ -696,6 +696,7 @@
 
   onMount(() => {
     refresh();
+    const unCfg = listen("config-updated", () => { refresh(); });
     const un = listen("palette-opened", () => {
       query = "";
       sel = 0;
@@ -773,10 +774,8 @@
               <span class="text-[10.5px] font-medium uppercase tracking-wide text-white/40">Add</span>
             {:else if item.tkind === "action"}
               <svg class="h-[26px] w-[26px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
-              <svg class="h-[26px] w-[26px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
               <span class="max-w-full truncate text-[11px] font-medium leading-tight text-white/75">{item.label}</span>
             {:else}
-              <svg class="h-[15px] w-[15px] text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
               <svg class="h-[15px] w-[15px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">{@html ICONS[item.icon]}</svg>
               {#if item.value}
                 <span class="text-[19px] font-semibold leading-none text-white/95">{item.value}</span>
