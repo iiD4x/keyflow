@@ -442,8 +442,10 @@ fn update_settings(app: AppHandle, state: tauri::State<AppState>, settings: Sett
         let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
         let prev = cfg.settings.autostart;
         let keep_backup_dir = cfg.settings.backup_dir.clone();
+        let keep_accent = cfg.settings.accent.clone();
         cfg.settings = settings;
         cfg.settings.backup_dir = keep_backup_dir;
+        cfg.settings.accent = keep_accent;
         cfg.save().map_err(|e| e.to_string())?;
         state.engine.update(&cfg);
         (prev, cfg.settings.autostart)
