@@ -148,7 +148,7 @@
     { kind: "reload", label: "Reload configuration", hint: "Re-read config.json from disk", icon: "reload" }
   ];
 
-  const QUICK_TZ = ["UTC", "Asia/Riyadh", "Europe/London", "America/New_York", "Asia/Dubai", "Asia/Tokyo"];
+  const QUICK_CITIES = ["Riyadh", "Halifax", "London", "New York", "Dubai", "Tokyo"];
 
   const liveNow = $derived.by(() => {
     void tick;
@@ -539,6 +539,36 @@
     if (kind === "weather" || kind === "worldclock") openCfg(w);
   }
 
+  type CityHit = { label: string; tz: string };
+
+  let cfgResults = $state<CityHit[]>([]);
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function searchCities(q: string): void {
+    const query = q.trim();
+    cfgResults = [];
+    if (searchTimer) clearTimeout(searchTimer);
+    if (query.length < 2) return;
+    searchTimer = setTimeout(async () => {
+      try {
+        const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?count=6&name=" + encodeURIComponent(query)).then((r) => r.json());
+        cfgResults = (geo?.results ?? []).map((h: { name: string; country?: string; timezone?: string }) => ({
+          label: h.country ? h.name + ", " + h.country : h.name,
+          tz: h.timezone ?? ""
+        }));
+      } catch {
+        cfgResults = [];
+      }
+    }, 220);
+  }
+
+  function selectCity(hit: CityHit): void {
+    const c = cfgPanel;
+    if (!c || !hit.tz) return;
+    cfgPanel = null;
+    cfgResults = [];
+    void persist(widgets.map((w) => (w.id === c.id ? { ...w, city: hit.label, tz: hit.tz } : w)), order());
+  }
   function openCfg(w: Widget): void {
     cfgPanel = { id: w.id, kind: w.kind, city: w.city ?? "", tz: w.tz ?? "" };
     tileMenu = null;
@@ -705,6 +735,8 @@
 
   onMount(() => {
     refresh();
+    const tickTimer = setInterval(() => (tick += 1), 1000);
+    const weatherTimer = setInterval(() => (void fetchWeather()), 900000);
     const unCfg = listen("config-updated", () => { refresh(); });
     const un = listen("palette-opened", () => {
       query = "";
@@ -918,15 +950,24 @@
       {:else}
         <input
           bind:this={cfgEl}
-          bind:value={cfgPanel.tz}
-          placeholder="Area/City, e.g. Asia/Tokyo"
+          bind:value={cfgPanel.city}
+          placeholder="City, e.g. Halifax" oninput={(e) => searchCities((e.currentTarget as HTMLInputElement).value)}
           spellcheck="false"
           onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCfg(); } }}
           class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-[12.5px] text-white/90 outline-none focus:border-[var(--accent)]"
         />
-        <div class="mt-2 flex flex-wrap gap-1.5">
-          {#each QUICK_TZ as z (z)}
-            <button type="button" onclick={() => cfgPanel && (cfgPanel.tz = z)} class="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/55 hover:bg-white/10">{z}</button>
+                {#if cfgResults.length > 0}
+          <div class="mt-2 max-h-[168px] overflow-y-auto rounded-lg border border-white/10 bg-white/[0.03]">
+            {#each cfgResults as h, i (h.label + i)}
+              <button type="button" onclick={() => selectCity(h)} class="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left hover:bg-white/10">
+                <span class="min-w-0 truncate text-[12.5px] text-white/85">{h.label}</span>
+                <span class="shrink-0 font-mono text-[10.5px] text-white/30">{h.tz}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}<div class="mt-2 flex flex-wrap gap-1.5">
+          {#each QUICK_CITIES as z (z)}
+            <button type="button" onclick={() => cfgPanel && (cfgPanel.city = z)} class="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/55 hover:bg-white/10">{z}</button>
           {/each}
         </div>
       {/if}
