@@ -487,6 +487,12 @@
 
   function onTileDown(item: Tile, e: PointerEvent): void {
     if (item.tkind === "add") return;
+    const el = e.currentTarget as HTMLElement;
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      // capture is best effort
+    }
     if (pressTimer) clearTimeout(pressTimer);
     pressTimer = setTimeout(() => {
       dragging = item.id;
@@ -515,8 +521,11 @@
     }
     if (dragging && localOrder) {
       const next = localOrder;
-      localOrder = null;
-      void persist(widgets, next);
+      // Keep the local order until the save comes back, otherwise the tiles snap
+      // back to the stored order for a frame and the drag looks like it glitches.
+      void persist(widgets, next).then(() => {
+        localOrder = null;
+      });
     }
     dragging = null;
   }
@@ -718,6 +727,8 @@
   class="relative flex h-screen w-screen flex-col overflow-hidden rounded-2xl border border-white/10 bg-[rgba(15,17,24,0.72)] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
   style={"--accent: " + (status?.accent ?? "#5B8CFF")}
   oncontextmenu={(e) => e.preventDefault()}
+  onpointerup={onTileUp}
+  onpointercancel={onTileUp}
 >
   <div class="flex items-center gap-3 px-5 pt-4 pb-3">
     <svg class="h-[18px] w-[18px] shrink-0 text-white/35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -765,7 +776,7 @@
               else activate(item);
             }}
             oncontextmenu={(e) => (item.tkind === "add" ? openAddMenu(e) : item.tkind === "widget" ? openTileMenu(e, item.id) : e.preventDefault())}
-            class={["group flex aspect-square select-none flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 text-center transition", dragging === item.id ? "scale-105 border-[var(--accent)] bg-white/[0.12] shadow-lg" : i === sel ? "border-[var(--accent)] bg-white/[0.08]" : "border-white/8 bg-white/[0.04] hover:border-white/15 hover:bg-white/[0.07]"].join(" ")}
+            class={["group flex aspect-square select-none flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 text-center transition", dragging === item.id ? "border-[var(--accent)] bg-white/[0.14] shadow-[0_10px_30px_rgba(0,0,0,0.45)]" : i === sel ? "border-[var(--accent)] bg-white/[0.08]" : "border-white/8 bg-white/[0.04] hover:border-white/15 hover:bg-white/[0.07]"].join(" ")}
           >
             {#if item.tkind === "add"}
               <span class="flex h-7 w-7 items-center justify-center rounded-xl border border-dashed border-white/25 text-white/40 group-hover:border-white/45 group-hover:text-white/75">
