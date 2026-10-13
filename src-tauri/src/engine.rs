@@ -74,7 +74,10 @@ impl Engine {
         let (tx, rx) = std::sync::mpsc::channel::<Job>();
         std::thread::spawn(move || {
             while let Ok(job) = rx.recv() {
-                exec::run_job(job);
+                // One bad job must not kill the typing worker.
+                if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| exec::run_job(job))).is_err() {
+                    exec::logline("panic caught in the typing worker");
+                }
             }
         });
         Engine {
@@ -197,6 +200,20 @@ fn enqueue(ctx: &HookCtx, snip: Snippet, count: usize, mode: TypingMode) {
 }
 
 unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+        hook_proc_inner(code, wparam, lparam)
+    })) {
+        Ok(v) => v,
+        Err(_) => {
+            // Unwinding across the FFI boundary aborts the process, which is how
+            // KeyFlow used to disappear with no trace at all.
+            exec::logline("panic caught in the keyboard hook");
+            CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
+        }
+    }
+}
+
+unsafe fn hook_proc_inner(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code >= 0 {
         let msg = wparam as u32;
         let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
@@ -216,6 +233,18 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
 }
 
 unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+        mouse_proc_inner(code, wparam, lparam)
+    })) {
+        Ok(v) => v,
+        Err(_) => {
+            exec::logline("panic caught in the mouse hook");
+            CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
+        }
+    }
+}
+
+unsafe fn mouse_proc_inner(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code >= 0 {
         let msg = wparam as u32;
         if msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_MBUTTONDOWN || msg == WM_XBUTTONDOWN {

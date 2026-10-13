@@ -16,6 +16,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 
 static PALETTE_SHOWN_MS: AtomicU64 = AtomicU64::new(0);
+static QUITTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -42,6 +43,8 @@ struct Status {
     fastkeys_db: Option<String>,
     backup_dir: String,
     backup_dir_is_default: bool,
+    exe_path: String,
+    data_dir: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -92,6 +95,10 @@ fn status_of(app: &AppHandle) -> Status {
         fastkeys_db: fdb::detect_path(),
         backup_dir: backup::resolved_dir(&cfg).display().to_string(),
         backup_dir_is_default: backup::resolved_dir(&cfg) == backup::default_dir(),
+        exe_path: std::env::current_exe()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "unknown".to_string()),
+        data_dir: config::data_dir().display().to_string(),
     }
 }
 
@@ -294,7 +301,10 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             "reload" => {
                 let _ = reload_config(app.clone(), app.state::<AppState>());
             }
-            "quit" => app.exit(0),
+            "quit" => {
+                QUITTING.store(true, Ordering::Relaxed);
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -830,16 +840,57 @@ fn main() {
                 autostart_item: std::sync::Mutex::new(None),
             });
 
+            // Make panics visible instead of a silent disappearance.
+            std::panic::set_hook(Box::new(|info| {
+                let loc = info
+                    .location()
+                    .map(|l| format!("{}:{}", l.file(), l.line()))
+                    .unwrap_or_else(|| "unknown location".to_string());
+                let msg = info
+                    .payload()
+                    .downcast_ref::<&str>()
+                    .map(|s| (*s).to_string())
+                    .or_else(|| info.payload().downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "unknown panic".to_string());
+                exec::logline_sync(&format!("PANIC at {}: {}", loc, msg));
+            }));
+
             setup_tray(app.handle())?;
-            {
+
+            let dir = config::data_dir();
+            let marker = dir.join("session.lock");
+            if let Ok(prev) = std::fs::read_to_string(&marker) {
+                exec::logline_sync(&format!("previous run did not exit cleanly: {}", prev.trim()));
+            }
+            let exe = std::env::current_exe()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "unknown".to_string());
+            let count = {
                 let st = app.state::<AppState>();
                 let c = st.config.lock().unwrap();
-                exec::logline(&format!(
-                    "KeyFlow {} started with {} snippets",
-                    env!("CARGO_PKG_VERSION"),
-                    c.snippets.len()
-                ));
-            }
+                c.snippets.len()
+            };
+            let config_path = config::config_path().display().to_string();
+            let started = backup::stamp();
+            exec::logline_sync(&format!(
+                "KeyFlow {} started with {} snippets",
+                env!("CARGO_PKG_VERSION"),
+                count
+            ));
+            exec::logline_sync(&format!("  exe: {}", exe));
+            exec::logline_sync(&format!("  data: {}", dir.display()));
+            exec::logline_sync(&format!("  config: {}", config_path));
+            let report = format!(
+                "KeyFlow {}\nstarted: {}\nsnippets: {}\nexe: {}\ndata: {}\nconfig: {}\n",
+                env!("CARGO_PKG_VERSION"),
+                started,
+                count,
+                exe,
+                dir.display(),
+                config_path
+            );
+            let _ = std::fs::write(dir.join("last-start.txt"), &report);
+            let _ = std::fs::write(&marker, format!("pid {} at {}", std::process::id(), started));
             spawn_config_watcher(app.handle().clone());
             Ok(())
         })
@@ -857,6 +908,20 @@ fn main() {
             }
             _ => {}
         })
-        .run(tauri::generate_context!())
-        .expect("error while running KeyFlow");
+        .build(tauri::generate_context!())
+        .expect("error while building KeyFlow")
+        .run(|_handle, event| match event {
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                if !QUITTING.load(Ordering::Relaxed) {
+                    // Losing a window must not end the app; KeyFlow lives in the tray.
+                    api.prevent_exit();
+                    exec::logline("exit requested while not quitting; staying in the tray");
+                }
+            }
+            tauri::RunEvent::Exit => {
+                exec::logline_sync("clean exit");
+                let _ = std::fs::remove_file(config::data_dir().join("session.lock"));
+            }
+            _ => {}
+        });
 }

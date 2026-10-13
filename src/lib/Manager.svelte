@@ -987,6 +987,13 @@
             Notes: Windows blocks input into elevated (admin) windows from normal apps, and anti-cheat games may ignore hook
             input. Quit any other text expander while KeyFlow runs to avoid double expansion of the same triggers.
           </p>
+          {#if status}
+            <div class="mt-3 border-t border-white/8 pt-3 font-mono text-[11.5px] leading-relaxed text-white/35">
+              <div>this window is v{status.version}</div>
+              <div class="break-all">exe: {status.exe_path}</div>
+              <div class="break-all">data: {status.data_dir}</div>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.7
+
+- Diagnostics: every start logs the version, executable path, data folder, config path and snippet count, and writes the same to last-start.txt
+- Diagnostics: a session marker is written at start and removed on a clean exit, so an unclean stop is reported in the log the next time the app runs
+- Diagnostics: panics are logged with their location instead of taking the process down without a trace
+- Robustness: a panic in the keyboard hook, the mouse hook or the typing worker no longer ends the app
+- Robustness: log writes are queued to a background thread, so the keyboard hook always returns to Windows well inside its time budget
+- Robustness: the app stays in the tray when the last window goes away instead of exiting
+- The About tab now shows the running build, its executable path and the data folder
+
 ## 0.2.6
 
 - The FastKeys import card moved into the Backup tab, so importing, backing up and restoring live in one place

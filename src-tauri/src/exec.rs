@@ -16,7 +16,42 @@ pub fn set_paste_fn(f: Box<dyn Fn(&str) -> bool + Send + Sync>) {
 pub struct SendHwnd(pub HWND);
 unsafe impl Send for SendHwnd {}
 
+static LOG_TX: OnceLock<std::sync::mpsc::Sender<String>> = OnceLock::new();
+
+fn log_sender() -> &'static std::sync::mpsc::Sender<String> {
+    LOG_TX.get_or_init(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let _ = std::thread::Builder::new()
+            .name("kf-log".to_string())
+            .spawn(move || {
+                use std::io::Write;
+                let dir = crate::config::data_dir();
+                let _ = std::fs::create_dir_all(&dir);
+                let path = dir.join("keyflow.log");
+                let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path).ok();
+                for msg in rx {
+                    if file.is_none() {
+                        file = std::fs::OpenOptions::new().create(true).append(true).open(&path).ok();
+                    }
+                    if let Some(f) = file.as_mut() {
+                        let _ = writeln!(f, "{}", msg);
+                        let _ = f.flush();
+                    }
+                }
+            });
+        tx
+    })
+}
+
+/// Never blocks the caller. The low-level keyboard hook has a strict time budget,
+/// and a slow hook gets removed by Windows without any warning.
 pub fn logline(msg: &str) {
+    let _ = log_sender().send(msg.to_string());
+}
+
+/// Writes on the calling thread, for messages that must be on disk before the
+/// process stops (panics, startup, clean exit).
+pub fn logline_sync(msg: &str) {
     use std::io::Write;
     let dir = crate::config::data_dir();
     let _ = std::fs::create_dir_all(&dir);

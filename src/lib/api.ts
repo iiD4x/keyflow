@@ -30,6 +30,8 @@ export interface Status {
   fastkeys_db: string | null;
   backup_dir: string;
   backup_dir_is_default: boolean;
+  exe_path: string;
+  data_dir: string;
 }
 
 export interface BackupEntry {
