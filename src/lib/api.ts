@@ -32,6 +32,14 @@ export interface Status {
   backup_dir_is_default: boolean;
   exe_path: string;
   data_dir: string;
+  widgets: Widget[];
+}
+
+export interface Widget {
+  id: string;
+  kind: string;
+  city?: string;
+  tz?: string;
 }
 
 export interface BackupEntry {
@@ -72,6 +80,7 @@ export const api = {
   setPaused: (paused: boolean) => invoke<Status>("set_paused", { paused }),
   setAutostart: (autostart: boolean) => invoke<Status>("set_autostart", { autostart }),
   reloadConfig: () => invoke<Status>("reload_config"),
+  saveWidgets: (widgets: Widget[]) => invoke<Status>("save_widgets", { widgets }),
   executeSnippet: (id: string) => invoke<void>("execute_snippet", { id }),
   copySnippet: (id: string) => invoke<void>("copy_snippet", { id }),
   copyText: (text: string) => invoke<void>("copy_text", { text }),

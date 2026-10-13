@@ -119,7 +119,7 @@ Anything else inside braces is typed literally, so {not-a-token} is safe in your
 
 ## Privacy
 
-- No telemetry, no analytics, no network requests. Everything runs locally.
+- No telemetry and no analytics; the app itself sends nothing. The one exception is a Weather widget, which you add yourself: it asks Open-Meteo for that city's current conditions and nothing else.
 - Trigger detection uses global keyboard and mouse hooks with a small in-memory buffer of recently typed characters, used only for matching and discarded continuously. Nothing you type is stored or transmitted.
 - Snippets are stored in plain text in %APPDATA%\KeyFlow\config.json, as with most text expanders. The Sensitive flag blurs values in the UI; it is not encryption.
 - The log at %APPDATA%\KeyFlow\keyflow.log records matches with character counts and timings, not the expanded text.

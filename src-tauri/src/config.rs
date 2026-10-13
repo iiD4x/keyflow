@@ -79,6 +79,21 @@ pub struct Config {
     pub snippets: Vec<Snippet>,
     #[serde(default)]
     pub settings: Settings,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub widgets: Vec<Widget>,
+}
+
+/// A tile on the palette dashboard: a live widget (clock, weather, ...) or an
+/// action that the user chose to keep around.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Widget {
+    pub id: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub city: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tz: String,
 }
 
 pub fn data_dir() -> PathBuf {

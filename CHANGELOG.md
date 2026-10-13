@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.9
+
+- The palette dashboard is now a grid of rounded square tiles instead of a row list
+- Built-in tiles are New snippet, Settings and Pause/Resume; Reload became an optional tile you add yourself
+- Widgets: Clock, Date, Weather and World clock, plus an Add tile to create them
+- Right-click any widget tile to configure it, move it left or right, or remove it; widgets are stored in config.json
+- Weather and geocoding come from Open-Meteo with no API key, and only weather tiles make a network request
+- Arrow keys navigate the tile grid: left and right move within a row, up and down move between rows and then into the snippet list
+
 ## 0.2.8
 
 - Fixed: keyboard shortcuts match the physical key instead of the produced character. Ctrl+N in the palette and Ctrl+Z / Ctrl+Y in the editor kept working only on a Latin layout; with Arabic (or any non-Latin layout) the key arrives as a different character and the shortcut was ignored

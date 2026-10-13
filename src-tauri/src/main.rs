@@ -7,7 +7,7 @@ mod fdb;
 mod win;
 mod backup;
 
-use config::{Config, Settings, Snippet, TypingMode};
+use config::{Config, Settings, Snippet, TypingMode, Widget};
 use engine::{Engine, Job, UiCmd};
 use serde::Serialize;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -45,6 +45,7 @@ struct Status {
     backup_dir_is_default: bool,
     exe_path: String,
     data_dir: String,
+    widgets: Vec<Widget>,
 }
 
 #[derive(Serialize, Clone)]
@@ -99,6 +100,7 @@ fn status_of(app: &AppHandle) -> Status {
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| "unknown".to_string()),
         data_dir: config::data_dir().display().to_string(),
+        widgets: cfg.widgets.clone(),
     }
 }
 
@@ -386,6 +388,17 @@ fn delete_snippet(app: AppHandle, state: tauri::State<AppState>, id: String) -> 
 #[tauri::command]
 fn get_status(app: AppHandle) -> Status {
     status_of(&app)
+}
+
+#[tauri::command]
+fn save_widgets(app: AppHandle, state: tauri::State<AppState>, widgets: Vec<Widget>) -> Result<Status, String> {
+    {
+        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        cfg.widgets = widgets;
+        cfg.save().map_err(|e| e.to_string())?;
+    }
+    let _ = app.emit("config-updated", ());
+    Ok(status_of(&app))
 }
 
 #[tauri::command]
@@ -768,6 +781,7 @@ fn main() {
             set_paused,
             set_autostart,
             reload_config,
+            save_widgets,
             hide_palette,
             open_manager,
             open_manager_snippet,
