@@ -250,12 +250,16 @@
   }
 
   async function refresh() {
-    try {
-      snippets = await api.listSnippets();
-      status = await api.getStatus();
-      if (!importPath && status.fastkeys_db) importPath = status.fastkeys_db;
-    } catch (e) {
-      // window opened before backend ready
+    for (let attempt = 0; attempt < 8; attempt++) {
+      try {
+        snippets = await api.listSnippets();
+        status = await api.getStatus();
+        if (!importPath && status.fastkeys_db) importPath = status.fastkeys_db;
+        return;
+      } catch {
+        // the window can open a moment before the backend answers
+        await new Promise((r) => setTimeout(r, 250));
+      }
     }
   }
 

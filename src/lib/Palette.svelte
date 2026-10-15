@@ -292,12 +292,16 @@
   }
 
   async function refresh() {
-    try {
-      snippets = await api.listSnippets();
-      status = await api.getStatus();
-      sel = 0;
-    } catch (e) {
-      // palette opened before backend ready; ignore
+    for (let attempt = 0; attempt < 8; attempt++) {
+      try {
+        snippets = await api.listSnippets();
+        status = await api.getStatus();
+        sel = 0;
+        return;
+      } catch {
+        // the window can open a moment before the backend answers
+        await new Promise((r) => setTimeout(r, 250));
+      }
     }
   }
 
