@@ -15,7 +15,8 @@
   let importPath = $state("");
   let replaceExisting = $state(false);
   let busy = $state(false);
-  let toast = $state<string | null>(null);
+  let toast = <string | null>(null);
+  let loadError = ('');
   let triggerInput = $state<HTMLInputElement>();
   let replEl = $state<HTMLTextAreaElement>();
   let dragOver = $state(false);
@@ -565,7 +566,11 @@
     </div>
   </header>
 
-  <main class="p-5">
+  {#if loadError}
+    <div class="border-b border-red-500/30 bg-red-500/10 px-5 py-2 text-[12.5px] text-red-200">
+      Could not read your snippets: {loadError} — your config file is untouched at %APPDATA%\KeyFlow\config.json. Try Reload from disk in Settings.
+    </div>
+  {/if}  <main class="p-5">
     {#if tab === "snippets"}
       <div class="flex gap-5">
         <section class="flex w-[320px] shrink-0 flex-col">

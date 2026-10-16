@@ -291,6 +291,8 @@
     return navItems.findIndex((i) => i.key === key);
   }
 
+  let loadError = $state('');
+
   async function refresh() {
     for (let attempt = 0; attempt < 8; attempt++) {
       try {
@@ -876,7 +878,7 @@
     {/if}
 
     {#if results.length === 0}
-      <div class="px-3 py-14 text-center text-[13px] text-white/30">No matches — add snippets in settings</div>
+      <div class="px-3 py-14 text-center text-[13px] text-white/30">{loadError ? "Could not read your snippets: " + loadError : "No matches — add snippets in settings"}</div>
     {/if}
   </div>
 
