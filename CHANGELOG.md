@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Fixed: restoring a backup file that lives outside the backup folder did nothing, because the confirmation prompt only existed on rows in the backup list
+- The Uninstall entry is written on install and the install-location marker is removed on uninstall, so Windows lists KeyFlow and a reinstall no longer reports "Already Installed" and then fails to find an uninstaller
+- Ctrl+Space is now registered as a Windows hotkey as well as detected in the keyboard hook, so the palette opens even when an emulator or game swallows the key first
+
 ## 0.3.0
 
 - The Settings tile shows a proper gear instead of a starburst
