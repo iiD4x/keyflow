@@ -884,6 +884,33 @@ fn main() {
                 });
             });
             engine.start_hook(ui);
+            // Ctrl+Space registered as a real Windows hotkey. The keyboard hook above
+            // normally consumes it first; this covers the case where another
+            // application's hook, an emulator or a game, swallows the key before ours
+            // ever sees it.
+            {
+                let hotkey_handle = app.handle().clone();
+                std::thread::spawn(move || unsafe {
+                    if win::RegisterHotKey(std::ptr::null_mut(), 1, win::MOD_CONTROL, win::VK_SPACE) == 0 {
+                        exec::logline("global hotkey: ctrl+space is taken by another application");
+                        return;
+                    }
+                    exec::logline("global hotkey registered: ctrl+space");
+                    let mut msg: win::MSG = std::mem::zeroed();
+                    loop {
+                        let r = win::GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0);
+                        if r <= 0 {
+                            break;
+                        }
+                        if msg.message == win::WM_HOTKEY && msg.wParam == 1 {
+                            let h = hotkey_handle.clone();
+                            let h2 = h.clone();
+                            let _ = h.run_on_main_thread(move || toggle_palette(&h2));
+                        }
+                    }
+                });
+            }
+
 
             app.manage(AppState {
                 config: std::sync::Mutex::new(cfg),

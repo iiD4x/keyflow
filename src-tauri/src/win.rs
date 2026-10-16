@@ -138,6 +138,8 @@ pub const VK_INSERT: u32 = 0x2D;
 pub const VK_DELETE: u32 = 0x2E;
 pub const VK_LWIN: u32 = 0x5B;
 pub const VK_RWIN: u32 = 0x5C;
+pub const WM_HOTKEY: UINT = 0x0312;
+pub const MOD_CONTROL: UINT = 0x0002;
 
 #[link(name = "user32")]
 extern "system" {
@@ -152,6 +154,7 @@ extern "system" {
     pub fn GetAsyncKeyState(vKey: i32) -> i16;
     pub fn GetKeyState(nVirtKey: i32) -> i16;
     pub fn MapVirtualKeyW(uCode: UINT, uMapType: UINT) -> UINT;
+    pub fn RegisterHotKey(hWnd: HWND, id: i32, fsModifiers: UINT, vk: UINT) -> BOOL;
 }
 
 #[link(name = "kernel32")]

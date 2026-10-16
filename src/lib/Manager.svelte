@@ -821,7 +821,15 @@
             being undone.
           </p>
           {#if backups}
-            <div class="mb-4">
+            {#if pendingRestore}
+              <div class="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2">
+                <span class="min-w-0 truncate text-[12.5px] text-amber-100">Replace everything loaded now with <span class="font-mono">{pendingRestore.split(/[\\/]/).pop()}</span>?</span>
+                <span class="flex shrink-0 gap-2">
+                  <button type="button" onclick={() => confirmRestore(pendingRestore as string)} disabled={busy} class="rounded-lg bg-amber-400/20 px-3 py-1.5 text-[12.5px] font-medium text-amber-100 hover:bg-amber-400/30">Restore</button>
+                  <button type="button" onclick={() => (pendingRestore = null)} class="rounded-lg bg-white/5 px-3 py-1.5 text-[12.5px] text-white/60 hover:bg-white/10">Cancel</button>
+                </span>
+              </div>
+            {/if}            <div class="mb-4">
               <div class="text-[11px] uppercase tracking-wide text-white/35">Backup folder</div>
               <div class="mt-1.5 flex gap-2">
                 <input
